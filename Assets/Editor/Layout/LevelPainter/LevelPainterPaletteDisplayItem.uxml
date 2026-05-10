@@ -1,0 +1,14 @@
+<ui:UXML xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:ui="UnityEngine.UIElements" xmlns:uie="UnityEditor.UIElements" noNamespaceSchemaLocation="../../../UIElementsSchema/UIElements.xsd" editor-extension-mode="False">
+    <ui:VisualElement data-source-type="LevelPainterPaletteDisplayItem, Assembly-CSharp-Editor" style="width: auto; height: 50px; max-width: 100px; max-height: 100px; align-items: center; flex-direction: row; align-self: auto;">
+        <ui:Image scale-mode="ScaleToFit" source="project://database/Resources/unity_builtin_extra?fileID=10309&amp;guid=0000000000000000f000000000000000&amp;type=0#Default-Checker-Gray" style="min-width: 50px; width: 50px; aspect-ratio: 1;">
+            <Bindings>
+                <ui:DataBinding property="source" data-source-path="Texture" binding-mode="ToTarget"/>
+            </Bindings>
+        </ui:Image>
+        <ui:Label text="Name" style="-unity-text-align: upper-left; left: 10px;">
+            <Bindings>
+                <ui:DataBinding property="text" data-source-path="Name" binding-mode="ToTarget"/>
+            </Bindings>
+        </ui:Label>
+    </ui:VisualElement>
+</ui:UXML>
