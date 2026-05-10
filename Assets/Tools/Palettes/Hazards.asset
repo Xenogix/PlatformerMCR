@@ -1,0 +1,21 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 35bbda1b0cf078c48ba02d108ea2e03e, type: 3}
+  m_Name: Hazards
+  m_EditorClassIdentifier: Assembly-CSharp::LevelPalette
+  items:
+  - prefab: {fileID: 3570479072865256547, guid: e6ee8b3198d29e24ea88061a3ae025c9, type: 3}
+  - prefab: {fileID: 3856767443852068752, guid: 4bb7a20e650eefc4aacd72b30ddef2fb, type: 3}
+  - prefab: {fileID: 4806024565994783464, guid: f4b090dba186a2643a05638aebf488b8, type: 3}
+  - prefab: {fileID: 6019528805374119492, guid: 2023a153fd41d6442912f4ad0019f703, type: 3}
+  - prefab: {fileID: 4044394123154446436, guid: fd584f4ef1317c342bae3e691f37008a, type: 3}
+  - prefab: {fileID: 253096347975009103, guid: 80b3302fadcd68544be723d4b380555e, type: 3}
