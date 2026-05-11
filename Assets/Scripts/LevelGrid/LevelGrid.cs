@@ -21,7 +21,7 @@ public class LevelGrid : MonoBehaviour
         if (prefab == null || !IsInBounds(cellPos)) return;
 
         var obj = InstantiateChild(prefab, UndoPaintCell);
-        var localPos = CellLocalPosition(cellPos) + BuildFlipOffset(CellSize, flipX, flipY);
+        var localPos = CellLocalPosition(cellPos) + BuildMeshOffset(prefab, flipX, flipY);
         obj.transform.SetLocalPositionAndRotation(localPos, prefab.transform.localRotation);
         obj.transform.localScale = BuildFlipScale(prefab, flipX, flipY);
     }
@@ -79,12 +79,11 @@ public class LevelGrid : MonoBehaviour
     }
 
     /// <summary>
-    /// Returns the local-space position of a grid cell on the XY plane.
-    /// X is centred within the cell; Y is at the bottom edge of the cell,
-    /// which matches the natural pivot point of 2D platformer sprites.
+    /// Returns the local-space position of the bottom-left corner of a grid cell.
+    /// Meshes are then offset via BuildMeshOffset so their own bottom-left sits here.
     /// </summary>
     public Vector3 CellLocalPosition(Vector3Int cell) => new(
-        cell.x * CellSize + CellSize * 0.5f,
+        cell.x * CellSize,
         cell.y * CellSize,
         cell.z * CellSize
     );
@@ -129,13 +128,45 @@ public class LevelGrid : MonoBehaviour
     }
 
     /// <summary>
-    /// Returns a local-space position offset to compensate for the cell pivot being at the
-    /// bottom edge rather than the centre. When flipY is active the negative-Y scale mirrors
-    /// around the bottom, so we shift up by one cell height to keep the object within its cell.
-    /// When flipX is active no offset is needed because the cell X pivot is already centred.
+    /// Returns a local-space XY offset so that the bottom-left of <paramref name="prefab"/>'s mesh
+    /// sits at the cell's bottom-left corner, regardless of where the mesh pivot is.
+    /// Without flip: rendered min = pivot + min → offset = -min (brings min to 0).
+    /// With    flip: scale negated, rendered min = pivot - max → offset = +max (brings -max+max to 0).
     /// </summary>
-    public static Vector3 BuildFlipOffset(float cellSize, bool flipX, bool flipY) =>
-        new(0f, flipY ? cellSize : 0f, 0f);
+    public static Vector3 BuildMeshOffset(GameObject prefab, bool flipX, bool flipY)
+    {
+        if (prefab == null) return Vector3.zero;
+
+        float minX = float.MaxValue, maxX = float.MinValue;
+        float minY = float.MaxValue, maxY = float.MinValue;
+        foreach (var mf in prefab.GetComponentsInChildren<MeshFilter>())
+        {
+            if (mf == null || mf.sharedMesh == null) continue;
+
+            var b = mf.sharedMesh.bounds;
+            var corners = new Vector3[]
+            {
+                new(b.min.x, b.min.y, b.min.z), new(b.max.x, b.min.y, b.min.z),
+                new(b.min.x, b.max.y, b.min.z), new(b.max.x, b.max.y, b.min.z),
+                new(b.min.x, b.min.y, b.max.z), new(b.max.x, b.min.y, b.max.z),
+                new(b.min.x, b.max.y, b.max.z), new(b.max.x, b.max.y, b.max.z),
+            };
+            foreach (var corner in corners)
+            {
+                var localPt = prefab.transform.InverseTransformPoint(mf.transform.TransformPoint(corner));
+                if (localPt.x < minX) minX = localPt.x;
+                if (localPt.x > maxX) maxX = localPt.x;
+                if (localPt.y < minY) minY = localPt.y;
+                if (localPt.y > maxY) maxY = localPt.y;
+            }
+        }
+
+        if (minX == float.MaxValue) return Vector3.zero;
+
+        float offsetX = flipX ? maxX : -minX;
+        float offsetY = flipY ? maxY : -minY;
+        return new Vector3(offsetX, offsetY, 0f);
+    }
 
     private GameObject InstantiateChild(GameObject prefab, string undoName)
     {

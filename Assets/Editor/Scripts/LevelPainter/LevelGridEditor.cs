@@ -63,7 +63,7 @@ public class LevelGridEditor : Editor
         if (session.SnapToGrid)
         {
             cellPos = WorldToCell(grid, worldPos, session.ZLayer);
-            targetPosition = CellToWorld(grid, cellPos) + LevelGrid.BuildFlipOffset(grid.CellSize, session.FlipX, session.FlipY);
+            targetPosition = CellToWorld(grid, cellPos) + LevelGrid.BuildMeshOffset(session.SelectedPrefab, session.FlipX, session.FlipY);
             DrawCellHighlight(grid, cellPos);
         }
         else
@@ -134,53 +134,52 @@ public class LevelGridEditor : Editor
 
     private static Vector3Int WorldToCell(LevelGrid grid, Vector3 worldPos, int zLayer)
     {
-        var o = grid.transform.position;
+        var local = grid.transform.InverseTransformPoint(worldPos);
         return new Vector3Int(
-            Mathf.FloorToInt((worldPos.x - o.x) / grid.CellSize),
-            Mathf.FloorToInt((worldPos.y - o.y) / grid.CellSize),
+            Mathf.FloorToInt(local.x / grid.CellSize),
+            Mathf.FloorToInt(local.y / grid.CellSize),
             zLayer
         );
     }
 
     private static Vector3 CellToWorld(LevelGrid grid, Vector3Int cell)
-        => grid.transform.position + grid.CellLocalPosition(cell);
+        => grid.transform.TransformPoint(grid.CellLocalPosition(cell));
 
     private void DrawGrid(LevelGrid grid, int zLayer)
     {
-        var o = grid.transform.position;
-        float zPos = o.z + zLayer * grid.CellSize;
         float w = grid.Size.x * grid.CellSize;
         float h = grid.Size.y * grid.CellSize;
 
         Handles.color = cellColor;
         for (int x = 0; x <= grid.Size.x; x++)
-            Handles.DrawLine(new Vector3(o.x + x * grid.CellSize, o.y, zPos), new Vector3(o.x + x * grid.CellSize, o.y + h, zPos));
+            Handles.DrawLine(
+                grid.transform.TransformPoint(new Vector3(x * grid.CellSize, 0, zLayer * grid.CellSize)),
+                grid.transform.TransformPoint(new Vector3(x * grid.CellSize, h, zLayer * grid.CellSize)));
         for (int y = 0; y <= grid.Size.y; y++)
-            Handles.DrawLine(new Vector3(o.x, o.y + y * grid.CellSize, zPos), new Vector3(o.x + w, o.y + y * grid.CellSize, zPos));
+            Handles.DrawLine(
+                grid.transform.TransformPoint(new Vector3(0, y * grid.CellSize, zLayer * grid.CellSize)),
+                grid.transform.TransformPoint(new Vector3(w, y * grid.CellSize, zLayer * grid.CellSize)));
 
         Handles.color = borderColor;
         Handles.DrawPolyLine(
-            new Vector3(o.x, o.y, zPos),
-            new Vector3(o.x + w, o.y, zPos),
-            new Vector3(o.x + w, o.y + h, zPos),
-            new Vector3(o.x, o.y + h, zPos),
-            new Vector3(o.x, o.y, zPos)
+            grid.transform.TransformPoint(new Vector3(0, 0, zLayer * grid.CellSize)),
+            grid.transform.TransformPoint(new Vector3(w, 0, zLayer * grid.CellSize)),
+            grid.transform.TransformPoint(new Vector3(w, h, zLayer * grid.CellSize)),
+            grid.transform.TransformPoint(new Vector3(0, h, zLayer * grid.CellSize)),
+            grid.transform.TransformPoint(new Vector3(0, 0, zLayer * grid.CellSize))
         );
     }
 
     private void DrawCellHighlight(LevelGrid grid, Vector3Int cellPos)
     {
-        // CellToWorld returns the bottom-centre of the cell (X is centred by +0.5f
-        // inside CellLocalPosition, Y is at the bottom edge)
         float s = grid.CellSize;
-        float h = s * 0.5f;
-        var c = CellToWorld(grid, cellPos);
+        var c = CellToWorld(grid, cellPos); // bottom-left corner
         Handles.DrawSolidRectangleWithOutline(
             new[] {
-                c + new Vector3(-h, 0, 0),
-                c + new Vector3( h, 0, 0),
-                c + new Vector3( h, s, 0),
-                c + new Vector3(-h, s, 0)
+                c + new Vector3(0, 0, 0),
+                c + new Vector3(s, 0, 0),
+                c + new Vector3(s, s, 0),
+                c + new Vector3(0, s, 0)
             },
             highlightFillColor,
             highlightOutlineColor
