@@ -32,18 +32,11 @@
                 <ui:DataBinding property="value" binding-mode="TwoWay" data-source-path="ZLayer"/>
             </Bindings>
         </ui:SliderInt>
-        <ui:VisualElement style="flex-direction: row; align-items: center; margin-bottom: 4px;">
-            <ui:Toggle label="Flip X" value="false" style="flex-grow: 1; flex-shrink: 1;">
-                <Bindings>
-                    <ui:DataBinding property="value" data-source-path="FlipX" binding-mode="TwoWay"/>
-                </Bindings>
-            </ui:Toggle>
-            <ui:Toggle label="Flip Y" value="false" style="flex-grow: 1; flex-shrink: 1;">
-                <Bindings>
-                    <ui:DataBinding property="value" data-source-path="FlipY" binding-mode="TwoWay"/>
-                </Bindings>
-            </ui:Toggle>
-        </ui:VisualElement>
+        <ui:SliderInt label="Rotation" value="0" fill="false" show-input-field="true" low-value="0" high-value="270" style="margin-bottom: 4px;">
+            <Bindings>
+                <ui:DataBinding property="value" data-source-path="Rotation" binding-mode="TwoWay"/>
+            </Bindings>
+        </ui:SliderInt>
         <ui:TextField label="Search" name="SearchField" placeholder-text="Filter by name..." style="margin-bottom: 4px;">
             <Bindings>
                 <ui:DataBinding property="value" data-source-path="SearchFilter" binding-mode="TwoWay"/>

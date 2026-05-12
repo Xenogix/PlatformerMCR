@@ -93,37 +93,18 @@ public class LevelPainterSession : INotifyBindablePropertyChanged
         set { searchFilter = value; Notify(); }
     }
 
-    private bool flipX = false;
+    private int rotation = 0;
     [CreateProperty]
-    public bool FlipX
+    public int Rotation
     {
-        get => flipX;
-        set { flipX = value; Notify(); }
+        get => rotation;
+        set { rotation = ((value % 360) + 360) % 360; Notify(); }
     }
 
-    private bool flipY = false;
-    [CreateProperty]
-    public bool FlipY
+    /// <summary>Cycles rotation by 90° on each press: 0 → 90 → 180 → 270 → 0.</summary>
+    public void CycleRotation()
     {
-        get => flipY;
-        set { flipY = value; Notify(); }
-    }
-
-    /// <summary>
-    /// Cycles through the four flip orientations in order:
-    /// normal → flip X → flip X+Y → flip Y → normal.
-    /// </summary>
-    public void CycleFlip()
-    {
-        (flipX, flipY) = (flipX, flipY) switch
-        {
-            (false, false) => (true,  false),
-            (true,  false) => (true,  true ),
-            (true,  true ) => (false, true ),
-            _              => (false, false),
-        };
-        Notify(nameof(FlipX));
-        Notify(nameof(FlipY));
+        Rotation = (rotation + 90) % 360;
     }
 
     // Resets the search filter backing field without firing propertyChanged

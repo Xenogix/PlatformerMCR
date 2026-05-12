@@ -59,6 +59,9 @@ PrefabInstance:
     - targetCorrespondingSourceObject: {fileID: 919132149155446097, guid: 652ba9967e417c341904779d9a71a36b, type: 3}
       insertIndex: -1
       addedObject: {fileID: -226496600316203975}
+    - targetCorrespondingSourceObject: {fileID: 919132149155446097, guid: 652ba9967e417c341904779d9a71a36b, type: 3}
+      insertIndex: -1
+      addedObject: {fileID: -325250154507763764}
   m_SourcePrefab: {fileID: 100100000, guid: 652ba9967e417c341904779d9a71a36b, type: 3}
 --- !u!1 &8849238673813823141 stripped
 GameObject:
@@ -86,3 +89,18 @@ BoxCollider:
   serializedVersion: 3
   m_Size: {x: 4, y: 4, z: 2.000001}
   m_Center: {x: 0, y: -1.9999999, z: 0}
+--- !u!114 &-325250154507763764
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 8849238673813823141}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 33d166b1979b3784ea9f49fe63407b41, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::GridObject
+  SizeX: 4
+  SizeY: 4
+  SizeZ: 2

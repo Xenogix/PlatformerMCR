@@ -55,5 +55,28 @@ PrefabInstance:
     m_RemovedComponents: []
     m_RemovedGameObjects: []
     m_AddedGameObjects: []
-    m_AddedComponents: []
+    m_AddedComponents:
+    - targetCorrespondingSourceObject: {fileID: 919132149155446097, guid: cb7b4dbe48a787147874dddfc191bcf6, type: 3}
+      insertIndex: -1
+      addedObject: {fileID: -9067330894460812107}
   m_SourcePrefab: {fileID: 100100000, guid: cb7b4dbe48a787147874dddfc191bcf6, type: 3}
+--- !u!1 &3817375644977011088 stripped
+GameObject:
+  m_CorrespondingSourceObject: {fileID: 919132149155446097, guid: cb7b4dbe48a787147874dddfc191bcf6, type: 3}
+  m_PrefabInstance: {fileID: 4051941405962544321}
+  m_PrefabAsset: {fileID: 0}
+--- !u!114 &-9067330894460812107
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 3817375644977011088}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 33d166b1979b3784ea9f49fe63407b41, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::GridObject
+  SizeX: 1
+  SizeY: 1
+  SizeZ: 1

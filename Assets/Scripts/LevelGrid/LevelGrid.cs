@@ -16,42 +16,42 @@ public class LevelGrid : MonoBehaviour
     /// Flips are applied as negative scale so the mesh mirrors through its own pivot point.
     /// The prefab's own baked rotation and scale are preserved.
     /// </summary>
-    public void Paint(Vector3Int cellPos, GameObject prefab, bool flipX = false, bool flipY = false)
+    public void Paint(Vector3Int cellPos, GameObject prefab, int rotation = 0)
     {
         if (prefab == null || !IsInBounds(cellPos)) return;
 
         var obj = InstantiateChild(prefab, UndoPaintCell);
-        var localPos = CellLocalPosition(cellPos) + BuildMeshOffset(prefab, flipX, flipY);
-        obj.transform.SetLocalPositionAndRotation(localPos, prefab.transform.localRotation);
-        obj.transform.localScale = BuildFlipScale(prefab, flipX, flipY);
+        var localPos = CellLocalPosition(cellPos) + BuildMeshOffset(prefab, rotation, CellSize);
+        var rot = BuildRotation(rotation) * prefab.transform.localRotation;
+        obj.transform.SetLocalPositionAndRotation(localPos, rot);
+        obj.transform.localScale = prefab.transform.localScale;
     }
 
-    /// <summary>Places <paramref name="prefab"/> at an arbitrary world position within the grid bounds, optionally flipping it on X or Y.</summary>
-    public void PaintFree(Vector3 worldPosition, GameObject prefab, bool flipX = false, bool flipY = false)
+    /// <summary>Places <paramref name="prefab"/> at an arbitrary world position within the grid bounds, with an optional rotation in degrees.</summary>
+    public void PaintFree(Vector3 worldPosition, GameObject prefab, int rotation = 0)
     {
         if (prefab == null || !IsInWorldBounds(worldPosition)) return;
 
         var obj = InstantiateChild(prefab, UndoPaintFree);
-        obj.transform.SetPositionAndRotation(worldPosition, prefab.transform.localRotation);
-        obj.transform.localScale = BuildFlipScale(prefab, flipX, flipY);
+        obj.transform.SetPositionAndRotation(worldPosition, BuildRotation(rotation) * prefab.transform.localRotation);
+        obj.transform.localScale = prefab.transform.localScale;
     }
 
-    /// <summary>Places <paramref name="prefab"/> at an arbitrary world position aligned to a surface normal, optionally flipping it on X or Y.</summary>
-    public void PaintFree(Vector3 worldPosition, GameObject prefab, Quaternion surfaceRotation, bool flipX = false, bool flipY = false)
+    /// <summary>Places <paramref name="prefab"/> at an arbitrary world position aligned to a surface normal, with an optional rotation in degrees.</summary>
+    public void PaintFree(Vector3 worldPosition, GameObject prefab, Quaternion surfaceRotation, int rotation = 0)
     {
         if (prefab == null || !IsInWorldBounds(worldPosition)) return;
 
         var obj = InstantiateChild(prefab, UndoPaintFree);
-        // Compose the prefab's own baked rotation with the surface-aligned rotation.
-        obj.transform.SetPositionAndRotation(worldPosition, prefab.transform.localRotation * surfaceRotation);
-        obj.transform.localScale = BuildFlipScale(prefab, flipX, flipY);
+        obj.transform.SetPositionAndRotation(worldPosition, surfaceRotation * BuildRotation(rotation) * prefab.transform.localRotation);
+        obj.transform.localScale = prefab.transform.localScale;
     }
 
     /// <summary>
     /// Destroys <paramref name="target"/> and places <paramref name="prefab"/>
-    /// at the same world position, optionally flipping it on X or Y.
+    /// at the same world position, with an optional rotation in degrees.
     /// </summary>
-    public void Replace(GameObject target, GameObject prefab, bool flipX = false, bool flipY = false)
+    public void Replace(GameObject target, GameObject prefab, int rotation = 0)
     {
         if (target == null || prefab == null) return;
 
@@ -59,8 +59,8 @@ public class LevelGrid : MonoBehaviour
         DestroyObject(target);
 
         var obj = InstantiateChild(prefab, UndoReplace);
-        obj.transform.SetPositionAndRotation(worldPos, prefab.transform.localRotation);
-        obj.transform.localScale = BuildFlipScale(prefab, flipX, flipY);
+        obj.transform.SetPositionAndRotation(worldPos, BuildRotation(rotation) * prefab.transform.localRotation);
+        obj.transform.localScale = prefab.transform.localScale;
     }
 
     /// <summary>Destroys a child object that belongs to this grid.</summary>
@@ -92,80 +92,142 @@ public class LevelGrid : MonoBehaviour
     private bool IsInBounds(Vector3Int cellPos) =>
         cellPos.x >= 0 && cellPos.y >= 0 && cellPos.x < Size.x && cellPos.y < Size.y;
 
-    /// <summary>
-    /// Builds a local scale that mirrors the prefab along world X (flipX) and/or world Y (flipY).
-    /// Because the prefab may have a baked rotation (e.g. 90° Y), its local axes do not
-    /// necessarily align with world axes.  We find which local axis is most aligned with
-    /// world X / world Y and negate that component, so the flip is always a visible
-    /// horizontal/vertical mirror regardless of the prefab's baked rotation.
-    /// </summary>
-    public static Vector3 BuildFlipScale(GameObject prefab, bool flipX, bool flipY)
-    {
-        var s = prefab.transform.localScale;
-        if (!flipX && !flipY) return s;
-
-        var rot = prefab.transform.localRotation;
-        var invRot = Quaternion.Inverse(rot);
-
-        float sx = s.x, sy = s.y, sz = s.z;
-
-        if (flipX)
-            NegateAxis(invRot * Vector3.right, ref sx, ref sy, ref sz);
-
-        if (flipY)
-            NegateAxis(invRot * Vector3.up, ref sx, ref sy, ref sz);
-
-        return new Vector3(sx, sy, sz);
-    }
-
-    // Negates the scale component whose local axis is most aligned with the given direction.
-    private static void NegateAxis(Vector3 localDir, ref float sx, ref float sy, ref float sz)
-    {
-        float ax = Mathf.Abs(localDir.x), ay = Mathf.Abs(localDir.y), az = Mathf.Abs(localDir.z);
-        if (ax >= ay && ax >= az) sx = -sx;
-        else if (ay >= ax && ay >= az) sy = -sy;
-        else sz = -sz;
-    }
+    /// <summary>Returns a Z-axis rotation quaternion for the given angle in degrees (0, 90, 180, 270).</summary>
+    public static Quaternion BuildRotation(int degrees) =>
+        Quaternion.AngleAxis(degrees, Vector3.forward);
 
     /// <summary>
-    /// Returns a local-space XY offset so that the bottom-left of <paramref name="prefab"/>'s mesh
-    /// sits at the cell's bottom-left corner, regardless of where the mesh pivot is.
-    /// Without flip: rendered min = pivot + min → offset = -min (brings min to 0).
-    /// With    flip: scale negated, rendered min = pivot - max → offset = +max (brings -max+max to 0).
+    /// Returns the footprint of <paramref name="prefab"/> in whole grid cells, accounting for rotation.
+    /// At 90° or 270°, SizeX and SizeY are swapped.
     /// </summary>
-    public static Vector3 BuildMeshOffset(GameObject prefab, bool flipX, bool flipY)
+    public static Vector2Int GetFootprintCells(GameObject prefab, float cellSize, int rotation = 0)
+    {
+        if (prefab == null) return Vector2Int.one;
+
+        Vector2Int fp;
+        var go = prefab.GetComponent<GridObject>();
+        if (go != null)
+        {
+            // A baked 90°/270° Y rotation makes the object's SizeZ become its grid X width.
+            float bakedY = prefab.transform.localEulerAngles.y;
+            bool bakedYSwap = Mathf.Approximately(Mathf.Abs(Mathf.DeltaAngle(bakedY, 90f)), 0f)
+                           || Mathf.Approximately(Mathf.Abs(Mathf.DeltaAngle(bakedY, 270f)), 0f);
+            fp = bakedYSwap ? new Vector2Int(go.SizeZ, go.SizeY) : new Vector2Int(go.SizeX, go.SizeY);
+        }
+        else
+        {
+            // Only use the baked Z rotation when computing the footprint from mesh bounds —
+            // baked X/Y rotations (e.g. 90° Y to face the camera) are visual-only.
+            var bakedZRot = Quaternion.AngleAxis(prefab.transform.localEulerAngles.z, Vector3.forward);
+            var b = GetLocalBounds(prefab);
+            var corners = new[]
+            {
+                new Vector3(b.min.x, b.min.y, 0f), new Vector3(b.max.x, b.min.y, 0f),
+                new Vector3(b.min.x, b.max.y, 0f), new Vector3(b.max.x, b.max.y, 0f),
+            };
+            var rMin = new Vector2(float.MaxValue, float.MaxValue);
+            var rMax = new Vector2(float.MinValue, float.MinValue);
+            foreach (var c in corners)
+            {
+                var r = bakedZRot * c;
+                rMin.x = Mathf.Min(rMin.x, r.x); rMin.y = Mathf.Min(rMin.y, r.y);
+                rMax.x = Mathf.Max(rMax.x, r.x); rMax.y = Mathf.Max(rMax.y, r.y);
+            }
+            fp = new Vector2Int(
+                Mathf.Max(1, Mathf.RoundToInt((rMax.x - rMin.x) / cellSize)),
+                Mathf.Max(1, Mathf.RoundToInt((rMax.y - rMin.y) / cellSize))
+            );
+        }
+
+        int normalizedRot = ((rotation % 360) + 360) % 360;
+        return (normalizedRot == 90 || normalizedRot == 270) ? new Vector2Int(fp.y, fp.x) : fp;
+    }
+
+    /// <summary>
+    /// Returns a local-space XY offset to place <paramref name="prefab"/> with its PivotX/PivotY
+    /// correctly anchored within its cell footprint, accounting for the applied rotation.
+    /// </summary>
+    public static Vector3 BuildMeshOffset(GameObject prefab, int rotation = 0, float cellSize = 1f)
     {
         if (prefab == null) return Vector3.zero;
 
-        float minX = float.MaxValue, maxX = float.MinValue;
-        float minY = float.MaxValue, maxY = float.MinValue;
+        var bounds = GetLocalBounds(prefab);
+        var go = prefab.GetComponent<GridObject>();
+        var pivotX = go != null ? go.PivotX : GridObject.Pivot.Center;
+        var pivotY = go != null ? go.PivotY : GridObject.Pivot.Center;
+
+        // Pick the pivot point in prefab-local space based on PivotX/Y.
+        float localPx = pivotX switch
+        {
+            GridObject.Pivot.Start => bounds.min.x,
+            GridObject.Pivot.End   => bounds.max.x,
+            _                      => bounds.center.x,
+        };
+        float localPy = pivotY switch
+        {
+            GridObject.Pivot.Start => bounds.min.y,
+            GridObject.Pivot.End   => bounds.max.y,
+            _                      => bounds.center.y,
+        };
+
+        // Only the baked Z rotation affects XY grid layout; X/Y baked rotations are purely visual
+        // (e.g. a 90° Y to face the camera) and must not corrupt the 2D pivot math.
+        var bakedZRot = Quaternion.AngleAxis(prefab.transform.localEulerAngles.z, Vector3.forward);
+        var totalRot = BuildRotation(rotation) * bakedZRot;
+        var meshPoint = totalRot * new Vector3(localPx, localPy, 0f);
+
+        // Compute the anchor in footprint space using the *unrotated* footprint,
+        // then rotate it by the user rotation around the footprint center so it
+        // follows the mesh pivot correctly (e.g. PivotY=Start at 90° → right wall).
+        var fpOrig = GetFootprintCells(prefab, cellSize, 0);
+        var fpRot  = GetFootprintCells(prefab, cellSize, rotation);
+
+        float origAx = pivotX switch
+        {
+            GridObject.Pivot.Start => 0f,
+            GridObject.Pivot.End   => fpOrig.x * cellSize,
+            _                      => fpOrig.x * cellSize * 0.5f,
+        };
+        float origAy = pivotY switch
+        {
+            GridObject.Pivot.Start => 0f,
+            GridObject.Pivot.End   => fpOrig.y * cellSize,
+            _                      => fpOrig.y * cellSize * 0.5f,
+        };
+
+        var fpOrigCenter = new Vector3(fpOrig.x * cellSize * 0.5f, fpOrig.y * cellSize * 0.5f, 0f);
+        var fpRotCenter  = new Vector3(fpRot.x  * cellSize * 0.5f, fpRot.y  * cellSize * 0.5f, 0f);
+
+        var anchorLocal = new Vector3(origAx, origAy, 0f);
+        var anchorPoint = BuildRotation(rotation) * (anchorLocal - fpOrigCenter) + fpRotCenter;
+
+        return anchorPoint - new Vector3(meshPoint.x, meshPoint.y, 0f);
+    }
+
+    // Returns the combined mesh bounds in prefab local space.
+    private static Bounds GetLocalBounds(GameObject prefab)
+    {
+        var bounds = new Bounds();
+        bool initialized = false;
         foreach (var mf in prefab.GetComponentsInChildren<MeshFilter>())
         {
             if (mf == null || mf.sharedMesh == null) continue;
-
             var b = mf.sharedMesh.bounds;
-            var corners = new Vector3[]
+            // Transform all 8 corners through mf → prefab local space.
+            foreach (var corner in new[]
             {
-                new(b.min.x, b.min.y, b.min.z), new(b.max.x, b.min.y, b.min.z),
-                new(b.min.x, b.max.y, b.min.z), new(b.max.x, b.max.y, b.min.z),
-                new(b.min.x, b.min.y, b.max.z), new(b.max.x, b.min.y, b.max.z),
-                new(b.min.x, b.max.y, b.max.z), new(b.max.x, b.max.y, b.max.z),
-            };
-            foreach (var corner in corners)
+                new Vector3(b.min.x, b.min.y, b.min.z), new Vector3(b.max.x, b.min.y, b.min.z),
+                new Vector3(b.min.x, b.max.y, b.min.z), new Vector3(b.max.x, b.max.y, b.min.z),
+                new Vector3(b.min.x, b.min.y, b.max.z), new Vector3(b.max.x, b.min.y, b.max.z),
+                new Vector3(b.min.x, b.max.y, b.max.z), new Vector3(b.max.x, b.max.y, b.max.z),
+            })
             {
                 var localPt = prefab.transform.InverseTransformPoint(mf.transform.TransformPoint(corner));
-                if (localPt.x < minX) minX = localPt.x;
-                if (localPt.x > maxX) maxX = localPt.x;
-                if (localPt.y < minY) minY = localPt.y;
-                if (localPt.y > maxY) maxY = localPt.y;
+                if (!initialized) { bounds = new Bounds(localPt, Vector3.zero); initialized = true; }
+                else bounds.Encapsulate(localPt);
             }
         }
-
-        if (minX == float.MaxValue) return Vector3.zero;
-
-        float offsetX = flipX ? maxX : -minX;
-        float offsetY = flipY ? maxY : -minY;
-        return new Vector3(offsetX, offsetY, 0f);
+        return bounds;
     }
 
     private GameObject InstantiateChild(GameObject prefab, string undoName)

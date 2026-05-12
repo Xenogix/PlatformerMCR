@@ -30,7 +30,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: -8679921383154817045, guid: ccabc9ff4a0084641abb7b79cee1d1c5, type: 3}
       propertyPath: m_LocalRotation.y
-      value: -0.7071068
+      value: 0.7071068
       objectReference: {fileID: 0}
     - target: {fileID: -8679921383154817045, guid: ccabc9ff4a0084641abb7b79cee1d1c5, type: 3}
       propertyPath: m_LocalRotation.z
@@ -42,7 +42,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: -8679921383154817045, guid: ccabc9ff4a0084641abb7b79cee1d1c5, type: 3}
       propertyPath: m_LocalEulerAnglesHint.y
-      value: -90
+      value: 90
       objectReference: {fileID: 0}
     - target: {fileID: -8679921383154817045, guid: ccabc9ff4a0084641abb7b79cee1d1c5, type: 3}
       propertyPath: m_LocalEulerAnglesHint.z
@@ -59,6 +59,9 @@ PrefabInstance:
     - targetCorrespondingSourceObject: {fileID: 919132149155446097, guid: ccabc9ff4a0084641abb7b79cee1d1c5, type: 3}
       insertIndex: -1
       addedObject: {fileID: 9036641277361801328}
+    - targetCorrespondingSourceObject: {fileID: 919132149155446097, guid: ccabc9ff4a0084641abb7b79cee1d1c5, type: 3}
+      insertIndex: -1
+      addedObject: {fileID: 1118270738775072648}
   m_SourcePrefab: {fileID: 100100000, guid: ccabc9ff4a0084641abb7b79cee1d1c5, type: 3}
 --- !u!1 &6942383886823434274 stripped
 GameObject:
@@ -87,3 +90,20 @@ MeshCollider:
   m_Convex: 1
   m_CookingOptions: 30
   m_Mesh: {fileID: -406415707458092265, guid: ccabc9ff4a0084641abb7b79cee1d1c5, type: 3}
+--- !u!114 &1118270738775072648
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 6942383886823434274}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 33d166b1979b3784ea9f49fe63407b41, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::GridObject
+  SizeX: 2
+  SizeY: 2
+  SizeZ: 2
+  PivotX: 0
+  PivotY: 0

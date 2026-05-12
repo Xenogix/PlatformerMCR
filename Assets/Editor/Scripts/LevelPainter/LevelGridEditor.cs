@@ -22,9 +22,8 @@ public class LevelGridEditor : Editor
 
     // Free paint state
     private Vector3 freePaintPosition;
-    private Quaternion freePaintRotation = Quaternion.identity;
-    private Quaternion freePaintSurfaceRotation = Quaternion.identity;
     private bool freePaintHitSurface;
+    private Quaternion freePaintSurfaceRotation = Quaternion.identity;
 
     // Hovered object for replace mode
     private GameObject hoveredObject;
@@ -44,7 +43,7 @@ public class LevelGridEditor : Editor
 
         if (Event.current.rawType == EventType.KeyDown && Event.current.keyCode == KeyCode.R)
         {
-            session.CycleFlip();
+            session.CycleRotation();
             Event.current.Use();
             SceneView.RepaintAll();
             return;
@@ -59,27 +58,30 @@ public class LevelGridEditor : Editor
 
         Vector3 targetPosition;
         Vector3Int cellPos;
+        Quaternion previewRot;
 
         if (session.SnapToGrid)
         {
             cellPos = WorldToCell(grid, worldPos, session.ZLayer);
-            targetPosition = CellToWorld(grid, cellPos) + LevelGrid.BuildMeshOffset(session.SelectedPrefab, session.FlipX, session.FlipY);
-            DrawCellHighlight(grid, cellPos);
+            targetPosition = CellToWorld(grid, cellPos) + LevelGrid.BuildMeshOffset(session.SelectedPrefab, session.Rotation, grid.CellSize);
+            previewRot = LevelGrid.BuildRotation(session.Rotation);
+            DrawFootprintHighlight(grid, cellPos, session.SelectedPrefab, session.Rotation);
         }
         else
         {
             freePaintHitSurface = TryRaycastGridChildren(grid, ray, out freePaintPosition, out freePaintSurfaceRotation);
-            freePaintRotation = session.AlignToNormal ? freePaintSurfaceRotation : Quaternion.identity;
             targetPosition = freePaintHitSurface ? freePaintPosition : worldPos;
             cellPos = WorldToCell(grid, targetPosition, session.ZLayer);
+            previewRot = freePaintHitSurface && session.AlignToNormal
+                ? freePaintSurfaceRotation * LevelGrid.BuildRotation(session.Rotation)
+                : LevelGrid.BuildRotation(session.Rotation);
 
             if (freePaintHitSurface)
                 DrawFreePositionHighlight(freePaintPosition, freePaintSurfaceRotation, grid.CellSize * 0.3f);
         }
 
         bool isPainting = session.Mode.HasFlag(LevelPaintMode.Paint) || session.Mode.HasFlag(LevelPaintMode.Replace);
-        var previewRot = (!session.SnapToGrid && freePaintHitSurface) ? freePaintRotation : Quaternion.identity;
-        UpdatePreview(targetPosition, previewRot, session.SelectedPrefab, session.FlipX, session.FlipY, isPainting);
+        UpdatePreview(targetPosition, previewRot, session.SelectedPrefab, isPainting);
 
         if (session.Mode.HasFlag(LevelPaintMode.Replace) || session.Mode.HasFlag(LevelPaintMode.Erase))
         {
@@ -105,11 +107,11 @@ public class LevelGridEditor : Editor
             if (session.Mode.HasFlag(LevelPaintMode.Paint))
             {
                 if (session.SnapToGrid)
-                    grid.Paint(cellPos, session.SelectedPrefab, session.FlipX, session.FlipY);
-                else if (freePaintHitSurface)
-                    grid.PaintFree(targetPosition, session.SelectedPrefab, freePaintRotation, session.FlipX, session.FlipY);
+                    grid.Paint(cellPos, session.SelectedPrefab, session.Rotation);
+                else if (freePaintHitSurface && session.AlignToNormal)
+                    grid.PaintFree(targetPosition, session.SelectedPrefab, freePaintSurfaceRotation, session.Rotation);
                 else
-                    grid.PaintFree(targetPosition, session.SelectedPrefab, session.FlipX, session.FlipY);
+                    grid.PaintFree(targetPosition, session.SelectedPrefab, session.Rotation);
             }
             else if (session.Mode.HasFlag(LevelPaintMode.Erase))
             {
@@ -120,7 +122,7 @@ public class LevelGridEditor : Editor
             else if (session.Mode.HasFlag(LevelPaintMode.Replace))
             {
                 if (hoveredObject != null)
-                    grid.Replace(hoveredObject, session.SelectedPrefab, session.FlipX, session.FlipY);
+                    grid.Replace(hoveredObject, session.SelectedPrefab, session.Rotation);
             }
             Event.current.Use();
         }
@@ -170,16 +172,18 @@ public class LevelGridEditor : Editor
         );
     }
 
-    private void DrawCellHighlight(LevelGrid grid, Vector3Int cellPos)
+    private void DrawFootprintHighlight(LevelGrid grid, Vector3Int cellPos, GameObject prefab, int rotation = 0)
     {
-        float s = grid.CellSize;
-        var c = CellToWorld(grid, cellPos); // bottom-left corner
+        var fp = LevelGrid.GetFootprintCells(prefab, grid.CellSize, rotation);
+        float w = fp.x * grid.CellSize;
+        float h = fp.y * grid.CellSize;
+        var origin = CellToWorld(grid, cellPos);
         Handles.DrawSolidRectangleWithOutline(
             new[] {
-                c + new Vector3(0, 0, 0),
-                c + new Vector3(s, 0, 0),
-                c + new Vector3(s, s, 0),
-                c + new Vector3(0, s, 0)
+                origin,
+                origin + new Vector3(w, 0, 0),
+                origin + new Vector3(w, h, 0),
+                origin + new Vector3(0, h, 0)
             },
             highlightFillColor,
             highlightOutlineColor
@@ -218,7 +222,7 @@ public class LevelGridEditor : Editor
         Handles.DrawSolidDisc(position, normal, radius * 0.5f);
     }
 
-    private void UpdatePreview(Vector3 position, Quaternion rotation, GameObject prefab, bool flipX, bool flipY, bool visible)
+    private void UpdatePreview(Vector3 position, Quaternion rotation, GameObject prefab, bool visible)
     {
         if (!visible || prefab == null)
         {
@@ -234,10 +238,8 @@ public class LevelGridEditor : Editor
             lastPreviewPrefab = prefab;
         }
 
-        // Preserve the prefab's baked rotation, apply surface alignment on top,
-        // then mirror via scale so the flip pivots through the object's own origin.
-        previewInstance.transform.SetPositionAndRotation(position, prefab.transform.localRotation * rotation);
-        previewInstance.transform.localScale = LevelGrid.BuildFlipScale(prefab, flipX, flipY);
+        previewInstance.transform.SetPositionAndRotation(position, rotation * prefab.transform.localRotation);
+        previewInstance.transform.localScale = prefab.transform.localScale;
     }
 
     private void DestroyPreview()
