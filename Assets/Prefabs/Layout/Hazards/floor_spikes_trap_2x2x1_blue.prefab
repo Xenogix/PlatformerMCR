@@ -59,6 +59,15 @@ PrefabInstance:
     - targetCorrespondingSourceObject: {fileID: 919132149155446097, guid: 461b521a47ea8f34396b6016cbe80b76, type: 3}
       insertIndex: -1
       addedObject: {fileID: -1357867417690138840}
+    - targetCorrespondingSourceObject: {fileID: 919132149155446097, guid: 461b521a47ea8f34396b6016cbe80b76, type: 3}
+      insertIndex: -1
+      addedObject: {fileID: 1453880755397567355}
+    - targetCorrespondingSourceObject: {fileID: 8971792325262512835, guid: 461b521a47ea8f34396b6016cbe80b76, type: 3}
+      insertIndex: -1
+      addedObject: {fileID: 8263233230629811255}
+    - targetCorrespondingSourceObject: {fileID: 8971792325262512835, guid: 461b521a47ea8f34396b6016cbe80b76, type: 3}
+      insertIndex: -1
+      addedObject: {fileID: 831860970092666515}
   m_SourcePrefab: {fileID: 100100000, guid: 461b521a47ea8f34396b6016cbe80b76, type: 3}
 --- !u!1 &4393960824769683386 stripped
 GameObject:
@@ -82,3 +91,62 @@ MonoBehaviour:
   SizeZ: 2
   PivotX: 0
   PivotY: 1
+--- !u!65 &1453880755397567355
+BoxCollider:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 4393960824769683386}
+  m_Material: {fileID: 0}
+  m_IncludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ExcludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_LayerOverridePriority: 0
+  m_IsTrigger: 1
+  m_ProvidesContacts: 0
+  m_Enabled: 1
+  serializedVersion: 3
+  m_Size: {x: 2, y: 1, z: 2}
+  m_Center: {x: 0, y: 0.5, z: 0}
+--- !u!1 &5528485559245549608 stripped
+GameObject:
+  m_CorrespondingSourceObject: {fileID: 8971792325262512835, guid: 461b521a47ea8f34396b6016cbe80b76, type: 3}
+  m_PrefabInstance: {fileID: 3475395481376137963}
+  m_PrefabAsset: {fileID: 0}
+--- !u!65 &8263233230629811255
+BoxCollider:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 5528485559245549608}
+  m_Material: {fileID: 0}
+  m_IncludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ExcludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_LayerOverridePriority: 0
+  m_IsTrigger: 0
+  m_ProvidesContacts: 0
+  m_Enabled: 1
+  serializedVersion: 3
+  m_Size: {x: 1.6, y: 0.5, z: 1.6}
+  m_Center: {x: 0, y: 1.25, z: 0}
+--- !u!114 &831860970092666515
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 5528485559245549608}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: d423c59c09ad5714b8085f0be87aa5bd, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::Hazard
