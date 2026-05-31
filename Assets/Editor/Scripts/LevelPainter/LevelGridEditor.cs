@@ -2,7 +2,7 @@ using System.Reflection;
 using UnityEditor;
 using UnityEngine;
 
-[CustomEditor(typeof(LevelGrid))]
+[CustomEditor(typeof(GridLevelLayout))]
 public class LevelGridEditor : Editor
 {
     private static readonly MethodInfo s_IntersectRayMesh = typeof(HandleUtility).GetMethod("IntersectRayMesh", BindingFlags.Static | BindingFlags.NonPublic);
@@ -32,7 +32,7 @@ public class LevelGridEditor : Editor
 
     private void OnSceneGUI()
     {
-        var grid = (LevelGrid)target;
+        var grid = (GridLevelLayout)target;
         var session = LevelPainterWindow.ActiveSession;
         if (grid == null || session == null) return;
 
@@ -44,6 +44,14 @@ public class LevelGridEditor : Editor
         if (Event.current.rawType == EventType.KeyDown && Event.current.keyCode == KeyCode.R)
         {
             session.CycleRotation();
+            Event.current.Use();
+            SceneView.RepaintAll();
+            return;
+        }
+
+        if (Event.current.rawType == EventType.KeyDown && Event.current.keyCode == KeyCode.F)
+        {
+            session.ToggleFlipY();
             Event.current.Use();
             SceneView.RepaintAll();
             return;
@@ -63,8 +71,8 @@ public class LevelGridEditor : Editor
         if (session.SnapToGrid)
         {
             cellPos = WorldToCell(grid, worldPos, session.ZLayer);
-            targetPosition = CellToWorld(grid, cellPos) + LevelGrid.BuildMeshOffset(session.SelectedPrefab, session.Rotation, grid.CellSize);
-            previewRot = LevelGrid.BuildRotation(session.Rotation);
+            targetPosition = CellToWorld(grid, cellPos) + GridLevelLayout.BuildMeshOffset(session.SelectedPrefab, session.Rotation, session.FlipY, grid.CellSize);
+            previewRot = GridLevelLayout.BuildRotation(session.Rotation, session.FlipY);
             DrawFootprintHighlight(grid, cellPos, session.SelectedPrefab, session.Rotation);
         }
         else
@@ -73,8 +81,8 @@ public class LevelGridEditor : Editor
             targetPosition = freePaintHitSurface ? freePaintPosition : worldPos;
             cellPos = WorldToCell(grid, targetPosition, session.ZLayer);
             previewRot = freePaintHitSurface && session.AlignToNormal
-                ? freePaintSurfaceRotation * LevelGrid.BuildRotation(session.Rotation)
-                : LevelGrid.BuildRotation(session.Rotation);
+                ? freePaintSurfaceRotation * GridLevelLayout.BuildRotation(session.Rotation, session.FlipY)
+                : GridLevelLayout.BuildRotation(session.Rotation, session.FlipY);
 
             if (freePaintHitSurface)
                 DrawFreePositionHighlight(freePaintPosition, freePaintSurfaceRotation, grid.CellSize * 0.3f);
@@ -107,11 +115,11 @@ public class LevelGridEditor : Editor
             if (session.Mode.HasFlag(LevelPaintMode.Paint))
             {
                 if (session.SnapToGrid)
-                    grid.Paint(cellPos, session.SelectedPrefab, session.Rotation);
+                    grid.Paint(cellPos, session.SelectedPrefab, session.Rotation, session.FlipY);
                 else if (freePaintHitSurface && session.AlignToNormal)
-                    grid.PaintFree(targetPosition, session.SelectedPrefab, freePaintSurfaceRotation, session.Rotation);
+                    grid.PaintFree(targetPosition, session.SelectedPrefab, freePaintSurfaceRotation, session.Rotation, session.FlipY);
                 else
-                    grid.PaintFree(targetPosition, session.SelectedPrefab, session.Rotation);
+                    grid.PaintFree(targetPosition, session.SelectedPrefab, session.Rotation, session.FlipY);
             }
             else if (session.Mode.HasFlag(LevelPaintMode.Erase))
             {
@@ -122,7 +130,7 @@ public class LevelGridEditor : Editor
             else if (session.Mode.HasFlag(LevelPaintMode.Replace))
             {
                 if (hoveredObject != null)
-                    grid.Replace(hoveredObject, session.SelectedPrefab, session.Rotation);
+                    grid.Replace(hoveredObject, session.SelectedPrefab, session.Rotation, session.FlipY);
             }
             Event.current.Use();
         }
@@ -134,7 +142,7 @@ public class LevelGridEditor : Editor
             SceneView.RepaintAll();
     }
 
-    private static Vector3Int WorldToCell(LevelGrid grid, Vector3 worldPos, int zLayer)
+    private static Vector3Int WorldToCell(GridLevelLayout grid, Vector3 worldPos, int zLayer)
     {
         var local = grid.transform.InverseTransformPoint(worldPos);
         return new Vector3Int(
@@ -144,10 +152,10 @@ public class LevelGridEditor : Editor
         );
     }
 
-    private static Vector3 CellToWorld(LevelGrid grid, Vector3Int cell)
+    private static Vector3 CellToWorld(GridLevelLayout grid, Vector3Int cell)
         => grid.transform.TransformPoint(grid.CellLocalPosition(cell));
 
-    private void DrawGrid(LevelGrid grid, int zLayer)
+    private void DrawGrid(GridLevelLayout grid, int zLayer)
     {
         float w = grid.Size.x * grid.CellSize;
         float h = grid.Size.y * grid.CellSize;
@@ -172,9 +180,9 @@ public class LevelGridEditor : Editor
         );
     }
 
-    private void DrawFootprintHighlight(LevelGrid grid, Vector3Int cellPos, GameObject prefab, int rotation = 0)
+    private void DrawFootprintHighlight(GridLevelLayout grid, Vector3Int cellPos, GameObject prefab, int rotation = 0)
     {
-        var fp = LevelGrid.GetFootprintCells(prefab, grid.CellSize, rotation);
+        var fp = GridLevelLayout.GetFootprintCells(prefab, grid.CellSize, rotation);
         float w = fp.x * grid.CellSize;
         float h = fp.y * grid.CellSize;
         var origin = CellToWorld(grid, cellPos);
@@ -256,7 +264,7 @@ public class LevelGridEditor : Editor
             SetHideFlagsRecursive(child.gameObject, flags);
     }
 
-    private static bool TryRaycastGridChildren(LevelGrid grid, Ray ray, out Vector3 position, out Quaternion rotation)
+    private static bool TryRaycastGridChildren(GridLevelLayout grid, Ray ray, out Vector3 position, out Quaternion rotation)
     {
         position = Vector3.zero;
         rotation = Quaternion.identity;
@@ -295,7 +303,7 @@ public class LevelGridEditor : Editor
     /// <summary>
     /// Walks up the hierarchy to find the direct child of <paramref name="grid"/> that contains <paramref name="obj"/>.
     /// </summary>
-    private static GameObject ResolveDirectChild(LevelGrid grid, GameObject obj)
+    private static GameObject ResolveDirectChild(GridLevelLayout grid, GameObject obj)
     {
         var t = obj.transform;
         while (t != null && t.parent != grid.transform)

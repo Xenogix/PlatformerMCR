@@ -1,3 +1,4 @@
+using System;
 using UnityEngine;
 using UnityEngine.InputSystem;
 
@@ -9,18 +10,38 @@ public class PlayerControllerInput : MonoBehaviour
     private InputAction moveAction;
     private InputAction jumpAction;
 
-    private void Start()
+    private Action<InputAction.CallbackContext> onJumpStarted;
+    private Action<InputAction.CallbackContext> onJumpHeldStarted;
+    private Action<InputAction.CallbackContext> onJumpCanceled;
+
+    private void Awake()
     {
         playerController = GetComponent<PlayerController>();
 
         moveAction = InputSystem.actions.FindAction("Move");
         jumpAction = InputSystem.actions.FindAction("Jump");
+
+        onJumpStarted = _ => playerController.RequestJump();
+        onJumpHeldStarted = _ => playerController.SetJumpHeld(true);
+        onJumpCanceled = _ => playerController.SetJumpHeld(false);
+    }
+
+    private void OnEnable()
+    {
+        jumpAction.started += onJumpStarted;
+        jumpAction.started += onJumpHeldStarted;
+        jumpAction.canceled += onJumpCanceled;
+    }
+
+    private void OnDisable()
+    {
+        jumpAction.started -= onJumpStarted;
+        jumpAction.started -= onJumpHeldStarted;
+        jumpAction.canceled -= onJumpCanceled;
     }
 
     private void Update()
     {
-        playerController.Move(moveAction.ReadValue<Vector2>());
-        if (jumpAction.WasPressedThisFrame())
-            playerController.Jump();
+        playerController.SetDirection(moveAction.ReadValue<Vector2>());
     }
 }
