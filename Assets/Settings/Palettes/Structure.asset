@@ -10,7 +10,7 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 35bbda1b0cf078c48ba02d108ea2e03e, type: 3}
-  m_Name: Layout
+  m_Name: Structure
   m_EditorClassIdentifier: Assembly-CSharp::LevelPalette
   items:
   - prefab: {fileID: 1743946849284053102, guid: 806069cfd7f8af9448b870cfa1a3dede, type: 3}

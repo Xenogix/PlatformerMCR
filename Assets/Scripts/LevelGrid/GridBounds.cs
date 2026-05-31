@@ -1,7 +1,7 @@
 using UnityEngine;
 
 [ExecuteAlways]
-[RequireComponent(typeof(GridLayout))]
+[RequireComponent(typeof(GridLevelLayout))]
 [RequireComponent(typeof(BoxCollider))]
 public class GridBounds : MonoBehaviour
 {
@@ -11,7 +11,7 @@ public class GridBounds : MonoBehaviour
     public float Padding = 0f;
 
     // Script references
-    private GridLayout _grid;
+    private GridLevelLayout _grid;
     private BoxCollider _box;
 
     private void OnEnable()
@@ -41,7 +41,7 @@ public class GridBounds : MonoBehaviour
 
     private void UpdateRefs()
     {
-        if (_grid == null) _grid = GetComponent<GridLayout>();
+        if (_grid == null) _grid = GetComponent<GridLevelLayout>();
         if (_box == null) _box = GetComponent<BoxCollider>();
     }
 

@@ -6,7 +6,7 @@ using Unity.Cinemachine;
 [AddComponentMenu("Cinemachine/Grid Confiner Zoom")]
 public class CinemachineGridConfiner : CinemachineExtension
 {
-    public GridLayout Grid;
+    public GridLevelLayout Grid;
     public float DesiredOrthographicSize = 10f;
     public float Margin = 0f;
 
@@ -26,18 +26,20 @@ public class CinemachineGridConfiner : CinemachineExtension
         // If the camera looks parallel to the gameplay plane we can't project onto it.
         if (Mathf.Abs(fwd.z) < Epsilon) return;
 
-        // Footprint of a *unit* (size = 1) orthographic view projected onto the z plane, measured as
+        // Footprint of a unit (size = 1) orthographic view projected onto the z plane, measured as
         // half-extents around the view center. The footprint scales linearly with OrthographicSize.
         float hx1 = 0f, hy1 = 0f;
         for (int sx = -1; sx <= 1; sx += 2)
-        for (int sy = -1; sy <= 1; sy += 2)
         {
-            // Corner offset from the camera at size 1: ±aspect along right, ±1 along up.
-            Vector3 corner = sx * aspect * right + sy * up;
-            // Project the corner along the view direction onto the plane (relative to the center).
-            Vector3 p = corner - (corner.z / fwd.z) * fwd;
-            hx1 = Mathf.Max(hx1, Mathf.Abs(p.x));
-            hy1 = Mathf.Max(hy1, Mathf.Abs(p.y));
+            for (int sy = -1; sy <= 1; sy += 2)
+            {
+                // Corner offset from the camera at size 1: +-aspect along right, +-1 along up.
+                Vector3 corner = sx * aspect * right + sy * up;
+                // Project the corner along the view direction onto the plane (relative to the center).
+                Vector3 p = corner - (corner.z / fwd.z) * fwd;
+                hx1 = Mathf.Max(hx1, Mathf.Abs(p.x));
+                hy1 = Mathf.Max(hy1, Mathf.Abs(p.y));
+            }
         }
         if (hx1 < Epsilon || hy1 < Epsilon) return;
 

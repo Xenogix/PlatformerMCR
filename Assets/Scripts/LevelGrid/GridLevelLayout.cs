@@ -1,7 +1,7 @@
 using System;
 using UnityEngine;
 
-public class GridLayout : MonoBehaviour
+public class GridLevelLayout : MonoBehaviour
 {
     // Inspector fields
     public Vector2Int Size = new(10, 10);
