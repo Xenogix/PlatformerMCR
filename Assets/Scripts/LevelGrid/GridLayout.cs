@@ -1,15 +1,21 @@
+using System;
 using UnityEngine;
 
-public class LevelGrid : MonoBehaviour
+public class GridLayout : MonoBehaviour
 {
     // Inspector fields
     public Vector2Int Size = new(10, 10);
     public float CellSize = 1f;
 
+    // Event called when field changed in the editor
+    public event Action FieldChanged;
+
     // Undo action names
     private const string UndoPaintCell = "Paint Level Cell";
     private const string UndoPaintFree = "Paint Level Free";
     private const string UndoReplace = "Replace Level Object";
+
+    private void OnValidate() => FieldChanged?.Invoke();
 
     /// <summary>
     /// Places <paramref name="prefab"/> at the given grid cell, optionally flipping it on X or Y.
