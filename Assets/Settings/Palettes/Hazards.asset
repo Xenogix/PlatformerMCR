@@ -13,12 +13,6 @@ MonoBehaviour:
   m_Name: Hazards
   m_EditorClassIdentifier: Assembly-CSharp::LevelPalette
   items:
-  - prefab: {fileID: 3570479072865256547, guid: e6ee8b3198d29e24ea88061a3ae025c9, type: 3}
-  - prefab: {fileID: 3856767443852068752, guid: 4bb7a20e650eefc4aacd72b30ddef2fb, type: 3}
-  - prefab: {fileID: 4806024565994783464, guid: f4b090dba186a2643a05638aebf488b8, type: 3}
-  - prefab: {fileID: 6019528805374119492, guid: 2023a153fd41d6442912f4ad0019f703, type: 3}
-  - prefab: {fileID: 4044394123154446436, guid: fd584f4ef1317c342bae3e691f37008a, type: 3}
-  - prefab: {fileID: 253096347975009103, guid: 80b3302fadcd68544be723d4b380555e, type: 3}
   - prefab: {fileID: 4393960824769683386, guid: 54b1b796ca47bcc4cbcd9345e45bd887, type: 3}
   - prefab: {fileID: 2821592494764223440, guid: e1947e3cd0b385b47ab51041befe72f4, type: 3}
   - prefab: {fileID: 7653665117162061927, guid: 1e8b2a62f8f49ea409f58c51b25d4056, type: 3}
