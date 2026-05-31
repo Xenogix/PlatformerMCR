@@ -1,14 +1,26 @@
+using UnityEditor;
 using UnityEngine;
 
 public class Level : MonoBehaviour
 {
-    [SerializeField] private LevelData data;
-    [SerializeField] private LevelSet set;
+    void Start()
+    {
+#if UNITY_EDITOR
+        // Properly set the level index in the editor to avoid issues with the Play Mode Start Scene option
+        if (LevelLoader.Index >= 0) return;
 
-    public LevelData Data => data;
-    public LevelSet Set => set;
+        var set = LevelLoader.Set;
+        if (set == null) return;
 
-    public void Complete() => LevelLoader.LoadNext(set, data);
+        // Find the matching scene in the LevelSet
+        var guid = AssetDatabase.AssetPathToGUID(gameObject.scene.path);
+        int index = set.Scenes.FindIndex(s => s.AssetGUID == guid);
 
-    public void Restart() => LevelLoader.Load(data);
+        // Update the index if found
+        if (index >= 0)
+            LevelLoader.SetIndex(index);
+        else
+            Debug.LogWarning($"Scene '{gameObject.scene.name}' was not found in the LevelSet.", this);
+#endif
+    }
 }

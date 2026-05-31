@@ -1,24 +1,39 @@
-using UnityEngine.SceneManagement;
+using System.Linq;
+using UnityEngine.AddressableAssets;
 using UnityEngine.ResourceManagement.AsyncOperations;
 using UnityEngine.ResourceManagement.ResourceProviders;
+using UnityEngine.SceneManagement;
 
-/// <summary>
-/// Loads level scenes in Single mode via Addressables. Each level scene is self-contained (it brings its
-/// own Main Camera + CinemachineBrain), so a Single load cleanly swaps everything — no persistent objects,
-/// no cross-scene camera. Order lives in the <see cref="LevelSet"/>.
-/// </summary>
 public static class LevelLoader
 {
-    /// <summary>Load a specific level (also used by a level-select menu later).</summary>
-    public static AsyncOperationHandle<SceneInstance> Load(LevelData level)
-        => level.SceneRef.LoadSceneAsync(LoadSceneMode.Single);
+    private const string LevelSetAddress = "levelSet";
 
-    /// <summary>Load the level after <paramref name="current"/> in <paramref name="set"/>.</summary>
-    public static void LoadNext(LevelSet set, LevelData current)
+    private static LevelSet _set;
+    public static LevelSet Set
     {
-        if (set == null || current == null) return;
-        var next = set.Get(set.IndexOf(current) + 1);
-        if (next == null) return;
-        Load(next);
+        get
+        {
+            if (_set == null)
+            {
+                var handle = Addressables.LoadAssetAsync<LevelSet>(LevelSetAddress);
+                _set = handle.WaitForCompletion();
+            }
+            return _set;
+        }
     }
+
+    public static int Index { get; private set; } = -1;
+
+    public static AsyncOperationHandle<SceneInstance> Load(int index)
+    {
+        var scene = Set.Scenes.ElementAtOrDefault(index);
+        if (scene == null) return default;
+
+        Index = index;
+        return scene.LoadSceneAsync(LoadSceneMode.Single);
+    }
+
+    public static void LoadNext() => Load(Index + 1);
+    public static void Restart() => Load(Index);
+    public static void SetIndex(int index) => Index = index;
 }
