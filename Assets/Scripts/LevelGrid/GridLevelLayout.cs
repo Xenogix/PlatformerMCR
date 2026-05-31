@@ -18,46 +18,46 @@ public class GridLevelLayout : MonoBehaviour
     private void OnValidate() => FieldChanged?.Invoke();
 
     /// <summary>
-    /// Places <paramref name="prefab"/> at the given grid cell, optionally flipping it on X or Y.
-    /// Flips are applied as negative scale so the mesh mirrors through its own pivot point.
+    /// Places <paramref name="prefab"/> at the given grid cell, with an optional Z rotation
+    /// in degrees and an optional 180° flip around the Y axis (mirrors the object left/right).
     /// The prefab's own baked rotation and scale are preserved.
     /// </summary>
-    public void Paint(Vector3Int cellPos, GameObject prefab, int rotation = 0)
+    public void Paint(Vector3Int cellPos, GameObject prefab, int rotation = 0, bool flipY = false)
     {
         if (prefab == null || !IsInBounds(cellPos)) return;
 
         var obj = InstantiateChild(prefab, UndoPaintCell);
-        var localPos = CellLocalPosition(cellPos) + BuildMeshOffset(prefab, rotation, CellSize);
-        var rot = BuildRotation(rotation) * prefab.transform.localRotation;
+        var localPos = CellLocalPosition(cellPos) + BuildMeshOffset(prefab, rotation, flipY, CellSize);
+        var rot = BuildRotation(rotation, flipY) * prefab.transform.localRotation;
         obj.transform.SetLocalPositionAndRotation(localPos, rot);
         obj.transform.localScale = prefab.transform.localScale;
     }
 
-    /// <summary>Places <paramref name="prefab"/> at an arbitrary world position within the grid bounds, with an optional rotation in degrees.</summary>
-    public void PaintFree(Vector3 worldPosition, GameObject prefab, int rotation = 0)
+    /// <summary>Places <paramref name="prefab"/> at an arbitrary world position within the grid bounds, with an optional rotation in degrees and Y flip.</summary>
+    public void PaintFree(Vector3 worldPosition, GameObject prefab, int rotation = 0, bool flipY = false)
     {
         if (prefab == null || !IsInWorldBounds(worldPosition)) return;
 
         var obj = InstantiateChild(prefab, UndoPaintFree);
-        obj.transform.SetPositionAndRotation(worldPosition, BuildRotation(rotation) * prefab.transform.localRotation);
+        obj.transform.SetPositionAndRotation(worldPosition, BuildRotation(rotation, flipY) * prefab.transform.localRotation);
         obj.transform.localScale = prefab.transform.localScale;
     }
 
-    /// <summary>Places <paramref name="prefab"/> at an arbitrary world position aligned to a surface normal, with an optional rotation in degrees.</summary>
-    public void PaintFree(Vector3 worldPosition, GameObject prefab, Quaternion surfaceRotation, int rotation = 0)
+    /// <summary>Places <paramref name="prefab"/> at an arbitrary world position aligned to a surface normal, with an optional rotation in degrees and Y flip.</summary>
+    public void PaintFree(Vector3 worldPosition, GameObject prefab, Quaternion surfaceRotation, int rotation = 0, bool flipY = false)
     {
         if (prefab == null || !IsInWorldBounds(worldPosition)) return;
 
         var obj = InstantiateChild(prefab, UndoPaintFree);
-        obj.transform.SetPositionAndRotation(worldPosition, surfaceRotation * BuildRotation(rotation) * prefab.transform.localRotation);
+        obj.transform.SetPositionAndRotation(worldPosition, surfaceRotation * BuildRotation(rotation, flipY) * prefab.transform.localRotation);
         obj.transform.localScale = prefab.transform.localScale;
     }
 
     /// <summary>
     /// Destroys <paramref name="target"/> and places <paramref name="prefab"/>
-    /// at the same world position, with an optional rotation in degrees.
+    /// at the same world position, with an optional rotation in degrees and Y flip.
     /// </summary>
-    public void Replace(GameObject target, GameObject prefab, int rotation = 0)
+    public void Replace(GameObject target, GameObject prefab, int rotation = 0, bool flipY = false)
     {
         if (target == null || prefab == null) return;
 
@@ -65,7 +65,7 @@ public class GridLevelLayout : MonoBehaviour
         DestroyObject(target);
 
         var obj = InstantiateChild(prefab, UndoReplace);
-        obj.transform.SetPositionAndRotation(worldPos, BuildRotation(rotation) * prefab.transform.localRotation);
+        obj.transform.SetPositionAndRotation(worldPos, BuildRotation(rotation, flipY) * prefab.transform.localRotation);
         obj.transform.localScale = prefab.transform.localScale;
     }
 
@@ -98,9 +98,13 @@ public class GridLevelLayout : MonoBehaviour
     private bool IsInBounds(Vector3Int cellPos) =>
         cellPos.x >= 0 && cellPos.y >= 0 && cellPos.x < Size.x && cellPos.y < Size.y;
 
-    /// <summary>Returns a Z-axis rotation quaternion for the given angle in degrees (0, 90, 180, 270).</summary>
-    public static Quaternion BuildRotation(int degrees) =>
-        Quaternion.AngleAxis(degrees, Vector3.forward);
+    /// <summary>
+    /// Returns the placement rotation: an optional 180° flip around Y (applied first, in the
+    /// object's own space) followed by a Z-axis rotation for the given angle (0, 90, 180, 270).
+    /// </summary>
+    public static Quaternion BuildRotation(int degrees, bool flipY = false) =>
+        Quaternion.AngleAxis(degrees, Vector3.forward) *
+        (flipY ? Quaternion.AngleAxis(180f, Vector3.up) : Quaternion.identity);
 
     /// <summary>
     /// Returns the footprint of <paramref name="prefab"/> in whole grid cells, accounting for rotation.
@@ -153,7 +157,7 @@ public class GridLevelLayout : MonoBehaviour
     /// Returns a local-space XY offset to place <paramref name="prefab"/> with its PivotX/PivotY
     /// correctly anchored within its cell footprint, accounting for the applied rotation.
     /// </summary>
-    public static Vector3 BuildMeshOffset(GameObject prefab, int rotation = 0, float cellSize = 1f)
+    public static Vector3 BuildMeshOffset(GameObject prefab, int rotation = 0, bool flipY = false, float cellSize = 1f)
     {
         if (prefab == null) return Vector3.zero;
 
@@ -179,8 +183,10 @@ public class GridLevelLayout : MonoBehaviour
         // Only the baked Z rotation affects XY grid layout; X/Y baked rotations are purely visual
         // (e.g. a 90° Y to face the camera) and must not corrupt the 2D pivot math.
         var bakedZRot = Quaternion.AngleAxis(prefab.transform.localEulerAngles.z, Vector3.forward);
-        var totalRot = BuildRotation(rotation) * bakedZRot;
-        var meshPoint = totalRot * new Vector3(localPx, localPy, 0f);
+        var pivotPoint = bakedZRot * new Vector3(localPx, localPy, 0f);
+        // A 180° Y flip mirrors the object's X within the XY plane; mirror the pivot to match.
+        if (flipY) pivotPoint.x = -pivotPoint.x;
+        var meshPoint = BuildRotation(rotation) * pivotPoint;
 
         // Compute the anchor in footprint space using the *unrotated* footprint,
         // then rotate it by the user rotation around the footprint center so it
@@ -188,7 +194,9 @@ public class GridLevelLayout : MonoBehaviour
         var fpOrig = GetFootprintCells(prefab, cellSize, 0);
         var fpRot  = GetFootprintCells(prefab, cellSize, rotation);
 
-        float origAx = pivotX switch
+        // Flipping swaps which side the X anchor sits on so the mirrored mesh fills the same footprint.
+        var anchorPivotX = flipY ? FlipPivot(pivotX) : pivotX;
+        float origAx = anchorPivotX switch
         {
             GridObject.Pivot.Start => 0f,
             GridObject.Pivot.End   => fpOrig.x * cellSize,
@@ -209,6 +217,14 @@ public class GridLevelLayout : MonoBehaviour
 
         return anchorPoint - new Vector3(meshPoint.x, meshPoint.y, 0f);
     }
+
+    // Swaps Start <-> End for a Y flip; Center is unchanged.
+    private static GridObject.Pivot FlipPivot(GridObject.Pivot pivot) => pivot switch
+    {
+        GridObject.Pivot.Start => GridObject.Pivot.End,
+        GridObject.Pivot.End   => GridObject.Pivot.Start,
+        _                      => GridObject.Pivot.Center,
+    };
 
     // Returns the combined mesh bounds in prefab local space.
     private static Bounds GetLocalBounds(GameObject prefab)

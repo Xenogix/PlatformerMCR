@@ -49,6 +49,14 @@ public class LevelGridEditor : Editor
             return;
         }
 
+        if (Event.current.rawType == EventType.KeyDown && Event.current.keyCode == KeyCode.F)
+        {
+            session.ToggleFlipY();
+            Event.current.Use();
+            SceneView.RepaintAll();
+            return;
+        }
+
         var ray = HandleUtility.GUIPointToWorldRay(Event.current.mousePosition);
         // XY plane: normal is Vector3.forward (Z axis), offset by ZLayer
         var plane = new Plane(Vector3.forward, new Vector3(0f, 0f, grid.transform.position.z + grid.CellSize * session.ZLayer));
@@ -63,8 +71,8 @@ public class LevelGridEditor : Editor
         if (session.SnapToGrid)
         {
             cellPos = WorldToCell(grid, worldPos, session.ZLayer);
-            targetPosition = CellToWorld(grid, cellPos) + GridLevelLayout.BuildMeshOffset(session.SelectedPrefab, session.Rotation, grid.CellSize);
-            previewRot = GridLevelLayout.BuildRotation(session.Rotation);
+            targetPosition = CellToWorld(grid, cellPos) + GridLevelLayout.BuildMeshOffset(session.SelectedPrefab, session.Rotation, session.FlipY, grid.CellSize);
+            previewRot = GridLevelLayout.BuildRotation(session.Rotation, session.FlipY);
             DrawFootprintHighlight(grid, cellPos, session.SelectedPrefab, session.Rotation);
         }
         else
@@ -73,8 +81,8 @@ public class LevelGridEditor : Editor
             targetPosition = freePaintHitSurface ? freePaintPosition : worldPos;
             cellPos = WorldToCell(grid, targetPosition, session.ZLayer);
             previewRot = freePaintHitSurface && session.AlignToNormal
-                ? freePaintSurfaceRotation * GridLevelLayout.BuildRotation(session.Rotation)
-                : GridLevelLayout.BuildRotation(session.Rotation);
+                ? freePaintSurfaceRotation * GridLevelLayout.BuildRotation(session.Rotation, session.FlipY)
+                : GridLevelLayout.BuildRotation(session.Rotation, session.FlipY);
 
             if (freePaintHitSurface)
                 DrawFreePositionHighlight(freePaintPosition, freePaintSurfaceRotation, grid.CellSize * 0.3f);
@@ -107,11 +115,11 @@ public class LevelGridEditor : Editor
             if (session.Mode.HasFlag(LevelPaintMode.Paint))
             {
                 if (session.SnapToGrid)
-                    grid.Paint(cellPos, session.SelectedPrefab, session.Rotation);
+                    grid.Paint(cellPos, session.SelectedPrefab, session.Rotation, session.FlipY);
                 else if (freePaintHitSurface && session.AlignToNormal)
-                    grid.PaintFree(targetPosition, session.SelectedPrefab, freePaintSurfaceRotation, session.Rotation);
+                    grid.PaintFree(targetPosition, session.SelectedPrefab, freePaintSurfaceRotation, session.Rotation, session.FlipY);
                 else
-                    grid.PaintFree(targetPosition, session.SelectedPrefab, session.Rotation);
+                    grid.PaintFree(targetPosition, session.SelectedPrefab, session.Rotation, session.FlipY);
             }
             else if (session.Mode.HasFlag(LevelPaintMode.Erase))
             {
@@ -122,7 +130,7 @@ public class LevelGridEditor : Editor
             else if (session.Mode.HasFlag(LevelPaintMode.Replace))
             {
                 if (hoveredObject != null)
-                    grid.Replace(hoveredObject, session.SelectedPrefab, session.Rotation);
+                    grid.Replace(hoveredObject, session.SelectedPrefab, session.Rotation, session.FlipY);
             }
             Event.current.Use();
         }
