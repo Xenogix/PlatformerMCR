@@ -522,7 +522,6 @@ Transform:
   m_Children:
   - {fileID: 467171471}
   - {fileID: 1573519291}
-  - {fileID: 516574900}
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &467171470
@@ -639,37 +638,6 @@ BoxCollider:
   serializedVersion: 3
   m_Size: {x: 28, y: 28, z: 10}
   m_Center: {x: 14, y: 14, z: 0}
---- !u!1 &516574899
-GameObject:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  serializedVersion: 6
-  m_Component:
-  - component: {fileID: 516574900}
-  m_Layer: 0
-  m_Name: SpawnPoint
-  m_TagString: Untagged
-  m_Icon: {fileID: 0}
-  m_NavMeshLayer: 0
-  m_StaticEditorFlags: 0
-  m_IsActive: 1
---- !u!4 &516574900
-Transform:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 516574899}
-  serializedVersion: 2
-  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 6, y: 7, z: 0}
-  m_LocalScale: {x: 1, y: 1, z: 1}
-  m_ConstrainProportionsScale: 0
-  m_Children: []
-  m_Father: {fileID: 402504736}
-  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1001 &562047624
 PrefabInstance:
   m_ObjectHideFlags: 0
@@ -2148,11 +2116,12 @@ MonoBehaviour:
   m_GameObject: {fileID: 1573519290}
   m_Enabled: 1
   m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 4d75924d76b05344aa410607bc57db98, type: 3}
+  m_Script: {fileID: 11500000, guid: 2214d441ed730ba4eadc8b81b8007889, type: 3}
   m_Name: 
-  m_EditorClassIdentifier: Unity.Cinemachine::Unity.Cinemachine.CinemachineConfiner3D
-  BoundingVolume: {fileID: 467171474}
-  SlowingDistance: 0
+  m_EditorClassIdentifier: Assembly-CSharp::CinemachineGridConfiner
+  Grid: {fileID: 467171472}
+  DesiredOrthographicSize: 10
+  Margin: 2
 --- !u!1 &1642073821
 GameObject:
   m_ObjectHideFlags: 0
@@ -2715,7 +2684,7 @@ Camera:
   far clip plane: 5000
   field of view: 40
   orthographic: 1
-  orthographic size: 10
+  orthographic size: 8.510098
   m_Depth: -1
   m_CullingMask:
     serializedVersion: 2
@@ -2740,7 +2709,7 @@ Transform:
   m_GameObject: {fileID: 2123839473}
   serializedVersion: 2
   m_LocalRotation: {x: 0.08715574, y: 0, z: 0, w: 0.9961947}
-  m_LocalPosition: {x: 6, y: 12, z: -5}
+  m_LocalPosition: {x: 14, y: 12.40465, z: -10}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
