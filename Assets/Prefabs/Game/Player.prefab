@@ -125,15 +125,8 @@ MonoBehaviour:
   deceleration: 35
   jumpForce: 25
   jumpBufferTime: 0.1
-  ascentGravityMultiplier: 1.5
-  lowJumpGravityMultiplier: 20
   fallGravityMultiplier: 7
-  groundLayer:
-    serializedVersion: 2
-    m_Bits: 4294967295
-  groundCheckSize: {x: 1, y: 0.1}
-  groundCheckDistance: 0.05
-  maxSlopeAngle: 60
+  lowJumpGravityMultiplier: 10
 --- !u!114 &8433654832190438974
 MonoBehaviour:
   m_ObjectHideFlags: 0
