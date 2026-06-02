@@ -2055,6 +2055,10 @@ PrefabInstance:
     m_TransformParent: {fileID: 0}
     m_Modifications:
     - target: {fileID: 3328988894466799920, guid: eb84d052cd3b21444ad438b6e2ac9df0, type: 3}
+      propertyPath: m_ClearFlags
+      value: 1
+      objectReference: {fileID: 0}
+    - target: {fileID: 3328988894466799920, guid: eb84d052cd3b21444ad438b6e2ac9df0, type: 3}
       propertyPath: orthographic size
       value: 6.8936543
       objectReference: {fileID: 0}
@@ -2132,7 +2136,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 7697594859950656151, guid: eb84d052cd3b21444ad438b6e2ac9df0, type: 3}
       propertyPath: m_LocalPosition.x
-      value: 13.256286
+      value: 13.254635
       objectReference: {fileID: 0}
     - target: {fileID: 7697594859950656151, guid: eb84d052cd3b21444ad438b6e2ac9df0, type: 3}
       propertyPath: m_LocalPosition.y
