@@ -1,7 +1,8 @@
 using System;
 using UnityEngine;
 
-[RequireComponent(typeof(CharacterController))]
+[RequireComponent(typeof(Rigidbody2D))]
+[RequireComponent(typeof(Collider2D))]
 public class PlayerController : MonoBehaviour
 {
     [SerializeField] private float moveSpeed = 8f;
@@ -11,33 +12,35 @@ public class PlayerController : MonoBehaviour
     [SerializeField] private float jumpBufferTime = 0.1f;
     [SerializeField] private float fallGravityMultiplier = 3.5f;
     [SerializeField] private float lowJumpGravityMultiplier = 2.5f;
+    [SerializeField] private LayerMask groundLayers = ~0;
+    [SerializeField] private float groundCheckDistance = 0.05f;
 
-    // Component references
-    private CharacterController cc;
+    private Rigidbody2D rb;
+    private Collider2D col;
 
-    // Private state
-    private Vector3 direction;
-    private Vector3 horizontalVelocity;
+    private Vector2 direction;
+    private Vector2 horizontalVelocity;
     private float verticalVelocity;
     private bool wasGrounded;
     private bool jumpRequested;
     private bool jumpHeld;
     private float lastJumpRequestTime;
 
-    // Events
     public event Action OnJumped;
     public event Action OnLanded;
 
-    // Public properties
-    public Vector3 Direction => direction;
-    public bool IsOnGround => cc.isGrounded;
-    public bool IsJumping => !cc.isGrounded && verticalVelocity > 0f;
-    public Vector3 Velocity => horizontalVelocity + Vector3.up * verticalVelocity;
+    public Vector2 Direction => direction;
+    public bool IsOnGround => CheckGrounded();
+    public bool IsJumping => !IsOnGround && verticalVelocity > 0f;
+    public Vector2 Velocity => horizontalVelocity + Vector2.up * verticalVelocity;
     public float MoveSpeed => moveSpeed;
 
     private void Start()
     {
-        cc = GetComponent<CharacterController>();
+        rb = GetComponent<Rigidbody2D>();
+        col = GetComponent<Collider2D>();
+        rb.gravityScale = 0f;
+        rb.freezeRotation = true;
     }
 
     private void Update()
@@ -47,20 +50,33 @@ public class PlayerController : MonoBehaviour
         ApplyGravity();
         CheckLanding();
 
-        // Apply the final movement to the character controller
-        cc.Move((horizontalVelocity + Vector3.up * verticalVelocity) * Time.deltaTime);
+        rb.linearVelocity = horizontalVelocity + Vector2.up * verticalVelocity;
     }
 
-    // Public methods for input
-    public void SetDirection(Vector3 newDirection) => direction = newDirection;
+    public void SetDirection(Vector2 newDirection) => direction = newDirection;
     public void RequestJump() { lastJumpRequestTime = Time.time; jumpRequested = true; }
     public void SetJumpHeld(bool held) => jumpHeld = held;
 
+    private bool CheckGrounded()
+    {
+        if (col == null) return false;
+        Bounds b = col.bounds;
+        // Cast a thin box just below the collider — slightly inset on X to avoid
+        // catching adjacent walls as ground.
+        return Physics2D.BoxCast(
+            origin: new Vector2(b.center.x, b.min.y),
+            size: new Vector2(b.size.x * 0.95f, 0.05f),
+            angle: 0f,
+            direction: Vector2.down,
+            distance: groundCheckDistance,
+            layerMask: groundLayers);
+    }
+
     private void ApplyMovement()
     {
-        Vector3 targetVelocity = direction * moveSpeed;
-        float rate = direction.sqrMagnitude > 0 ? acceleration : deceleration;
-        horizontalVelocity = Vector3.MoveTowards(horizontalVelocity, targetVelocity, rate * Time.deltaTime);
+        Vector2 targetVelocity = direction * moveSpeed;
+        float rate = direction.sqrMagnitude > 0f ? acceleration : deceleration;
+        horizontalVelocity = Vector2.MoveTowards(horizontalVelocity, targetVelocity, rate * Time.deltaTime);
     }
 
     private void ApplyJump()
@@ -68,7 +84,7 @@ public class PlayerController : MonoBehaviour
         if (jumpRequested && Time.time - lastJumpRequestTime > jumpBufferTime)
             jumpRequested = false;
 
-        if (jumpRequested && cc.isGrounded)
+        if (jumpRequested && CheckGrounded())
         {
             verticalVelocity = jumpForce;
             jumpRequested = false;
@@ -78,24 +94,22 @@ public class PlayerController : MonoBehaviour
 
     private void ApplyGravity()
     {
-        if (cc.isGrounded && verticalVelocity < 0f)
+        if (CheckGrounded() && verticalVelocity < 0f)
         {
             verticalVelocity = -2f;
             return;
         }
 
-        // Apply variable gravity multipliers based on whether the player is ascending, descending, or has released the jump button
-        // This allows for variable jump heights and quicker falls
         float multiplier = fallGravityMultiplier;
         if (verticalVelocity > 0f && !jumpHeld)
             multiplier = lowJumpGravityMultiplier;
 
-        verticalVelocity += Physics.gravity.y * multiplier * Time.deltaTime;
+        verticalVelocity += Physics2D.gravity.y * multiplier * Time.deltaTime;
     }
 
     private void CheckLanding()
     {
-        bool grounded = cc.isGrounded;
+        bool grounded = CheckGrounded();
         if (grounded && !wasGrounded) OnLanded?.Invoke();
         wasGrounded = grounded;
     }
