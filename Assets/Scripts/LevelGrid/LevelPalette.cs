@@ -1,7 +1,7 @@
 using System.Collections.Generic;
 using UnityEngine;
 
-[CreateAssetMenu(fileName = "Data", menuName = "ScriptableObjects/LevelPainterPalette")]
+[CreateAssetMenu(fileName = "Data", menuName = "ScriptableObjects/Level Painter Palette")]
 public class LevelPalette : ScriptableObject
 {
     [SerializeField]

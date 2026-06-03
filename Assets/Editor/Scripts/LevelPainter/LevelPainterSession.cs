@@ -107,6 +107,17 @@ public class LevelPainterSession : INotifyBindablePropertyChanged
         Rotation = (rotation + 90) % 360;
     }
 
+    private bool flipY = false;
+    [CreateProperty]
+    public bool FlipY
+    {
+        get => flipY;
+        set { flipY = value; Notify(); }
+    }
+
+    /// <summary>Toggles a 180° flip around the Y axis (mirrors the object left/right).</summary>
+    public void ToggleFlipY() => FlipY = !flipY;
+
     // Resets the search filter backing field without firing propertyChanged
     public void ResetSearchFilter() => searchFilter = string.Empty;
 
