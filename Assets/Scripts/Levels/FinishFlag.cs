@@ -1,14 +1,23 @@
 using UnityEngine;
 
-[RequireComponent(typeof(Collider))]
+// Collider2D may live on this GameObject or on a child. When the collider is on
+// a child, a Kinematic Rigidbody2D on this GameObject is required for triggers
+// to bubble up.
 public class FinishFlag : MonoBehaviour
 {
-    private void Reset() => GetComponent<Collider>().isTrigger = true;
-
-    private void OnTriggerEnter(Collider other)
+    private bool hasTriggered = false;
+    private void Reset()
     {
-        if (other.GetComponentInParent<Player>() == null) return;
+        var col = GetComponentInChildren<Collider2D>();
+        if (col != null) col.isTrigger = true;
+    }
 
+    private void OnTriggerEnter2D(Collider2D other)
+    {
+        if (hasTriggered) return;
+        
+        if (other.GetComponentInParent<Player>() == null) return;
+        hasTriggered = true;
         LevelLoader.LoadNext();
     }
 }
