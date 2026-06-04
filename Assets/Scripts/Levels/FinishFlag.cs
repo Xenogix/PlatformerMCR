@@ -5,6 +5,7 @@ using UnityEngine;
 // to bubble up.
 public class FinishFlag : MonoBehaviour
 {
+    private bool hasTriggered = false;
     private void Reset()
     {
         var col = GetComponentInChildren<Collider2D>();
@@ -13,8 +14,10 @@ public class FinishFlag : MonoBehaviour
 
     private void OnTriggerEnter2D(Collider2D other)
     {
-        if (other.GetComponentInParent<Player>() == null) return;
-
-        LevelLoader.LoadNext();
+      if (hasTriggered) return;
+        
+      if (other.GetComponentInParent<Player>() == null) return;
+      hasTriggered = true;
+      LevelLoader.LoadNext();
     }
 }
