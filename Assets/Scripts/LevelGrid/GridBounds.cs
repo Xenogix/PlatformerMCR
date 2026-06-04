@@ -1,8 +1,10 @@
 using UnityEngine;
 
+// BoxCollider2D may live on this GameObject or on a child. When the collider is
+// on a child, a Kinematic Rigidbody2D on this GameObject is required for triggers
+// to bubble up.
 [ExecuteAlways]
 [RequireComponent(typeof(GridLevelLayout))]
-[RequireComponent(typeof(BoxCollider2D))]
 public class GridBounds : MonoBehaviour
 {
     public float Padding = 0f;
@@ -38,7 +40,7 @@ public class GridBounds : MonoBehaviour
     private void UpdateRefs()
     {
         if (_grid == null) _grid = GetComponent<GridLevelLayout>();
-        if (_box == null) _box = GetComponent<BoxCollider2D>();
+        if (_box == null) _box = GetComponentInChildren<BoxCollider2D>(true);
     }
 
     public void Refresh()
