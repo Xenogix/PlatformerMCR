@@ -14,10 +14,10 @@ public class FinishFlag : MonoBehaviour
 
     private void OnTriggerEnter2D(Collider2D other)
     {
-      if (hasTriggered) return;
+        if (hasTriggered) return;
         
-      if (other.GetComponentInParent<Player>() == null) return;
-      hasTriggered = true;
-      LevelLoader.LoadNext();
+        if (other.GetComponentInParent<Player>() == null) return;
+        hasTriggered = true;
+        LevelLoader.LoadNext();
     }
 }
