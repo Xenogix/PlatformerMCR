@@ -1,18 +1,16 @@
 using UnityEngine;
 
+// BoxCollider2D may live on this GameObject or on a child. When the collider is
+// on a child, a Kinematic Rigidbody2D on this GameObject is required for triggers
+// to bubble up.
 [ExecuteAlways]
 [RequireComponent(typeof(GridLevelLayout))]
-[RequireComponent(typeof(BoxCollider))]
 public class GridBounds : MonoBehaviour
 {
-    // Inspector Fields
-    public float Depth = 10f;
-    public float DepthCenter = 0f;
     public float Padding = 0f;
 
-    // Script references
     private GridLevelLayout _grid;
-    private BoxCollider _box;
+    private BoxCollider2D _box;
 
     private void OnEnable()
     {
@@ -32,9 +30,9 @@ public class GridBounds : MonoBehaviour
         if (_grid != null && _box != null) Refresh();
     }
 
-    private void OnTriggerExit(Collider other)
+    private void OnTriggerExit2D(Collider2D other)
     {
-        // Kill all entities that leave the bounds
+        // Kill all entities that leave the bounds.
         if (other.TryGetComponent<Entity>(out var entity))
             entity.Kill();
     }
@@ -42,7 +40,7 @@ public class GridBounds : MonoBehaviour
     private void UpdateRefs()
     {
         if (_grid == null) _grid = GetComponent<GridLevelLayout>();
-        if (_box == null) _box = GetComponent<BoxCollider>();
+        if (_box == null) _box = GetComponentInChildren<BoxCollider2D>(true);
     }
 
     public void Refresh()
@@ -51,7 +49,7 @@ public class GridBounds : MonoBehaviour
         float h = _grid.Size.y * _grid.CellSize;
 
         _box.isTrigger = true;
-        _box.size = new Vector3(w + Padding * 2f, h + Padding * 2f, Depth);
-        _box.center = new Vector3(w * 0.5f, h * 0.5f, DepthCenter);
+        _box.size = new Vector2(w + Padding * 2f, h + Padding * 2f);
+        _box.offset = new Vector2(w * 0.5f, h * 0.5f);
     }
 }
