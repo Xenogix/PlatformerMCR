@@ -12,6 +12,7 @@ public class PlayerController : MonoBehaviour
 
     [Header("Jump")]
     [SerializeField] private float jumpForce = 12f;
+    [Tooltip("How long a jump press is buffered before landing, in seconds (converted to fixed ticks in Awake).")]
     [SerializeField] private float jumpBufferTime = 0.1f;
     [Tooltip("Gravity multiplier while ascending with jump held. >1 caps the jump height even when held; ~1.5 gives a generous held jump.")]
     [SerializeField] private float ascentGravityMultiplier = 1.5f;
@@ -33,14 +34,29 @@ public class PlayerController : MonoBehaviour
     private Collider2D col;
 
     private Vector2 direction;
-    private bool jumpRequested;
     private bool jumpHeld;
-    private float lastJumpRequestTime;
-    private float lastJumpedTime = -1f;
     private bool wasGrounded;
     private float baseGravityScale = 1f;
     private Vector2 groundNormal = Vector2.up;
-    private const float postJumpGroundedSuppressTime = 0.1f;
+
+    // Jump buffering / ground-suppress use fixed-tick timing (not Time.time) so they're
+    // rewind-safe and replay-stable: Time.time keeps marching forward across a rewind, but
+    // tick-based timing moves with the clock, and a clone replaying the same commands
+    // reproduces the same jumps. The two seconds-durations are converted to tick window
+    // lengths once in Awake (the fixed timestep is constant).
+    private const float PostJumpGroundedSuppressSeconds = 0.1f;
+    private int jumpBufferTicks;     // jump-buffer window length, in ticks
+    private int groundSuppressTicks; // post-jump ground-suppress window length, in ticks
+
+    // Jump buffer / ground-suppress are stored as absolute tick STAMPS (not counting-down
+    // counters) and compared against the current tick. That makes them rewind-safe with no
+    // extra channel: after a rewind the current tick moves back while a stamp stays, so the
+    // stamp sits in the future and the "happened recently in the past" window fails — no
+    // phantom jump. A detected backward tick also clears them outright.
+    private int lastJumpPressTick = int.MinValue;
+    private int lastJumpedTick = int.MinValue;
+    private bool jumpRequested;
+    private int currentTick;
 
     public event Action OnJumped;
     public event Action OnLanded;
@@ -58,53 +74,66 @@ public class PlayerController : MonoBehaviour
         rb.freezeRotation = true;
         if (rb.gravityScale <= 0f) rb.gravityScale = baseGravityScale;
         baseGravityScale = rb.gravityScale;
+
+        jumpBufferTicks = GameClock.SecondsToTicks(jumpBufferTime);
+        groundSuppressTicks = GameClock.SecondsToTicks(PostJumpGroundedSuppressSeconds);
+
+        _groundFilter = new ContactFilter2D { useTriggers = false, useLayerMask = true };
+        _groundFilter.SetLayerMask(groundLayer);
     }
 
     public void SetDirection(Vector2 newDirection) => direction = newDirection;
-    public void RequestJump()
-    {
-        lastJumpRequestTime = Time.time;
-        jumpRequested = true;
-    }
+
+    public void RequestJump() => jumpRequested = true;
+
     public void SetJumpHeld(bool held)
     {
         jumpHeld = held;
-        // Releasing the jump button cancels any pending buffered jump request.
-        // Without this, a request set on press stays alive for jumpBufferTime,
-        // and if the player happens to be grounded during that window it fires.
-        if (!held) jumpRequested = false;
+        // Releasing the jump button cancels any pending buffered jump, so a tap doesn't fire
+        // a late jump if the player happens to touch ground during the buffer window.
+        if (!held) { jumpRequested = false; lastJumpPressTick = int.MinValue; }
     }
 
-    private void FixedUpdate()
+    /// <summary>
+    /// Advance one fixed tick. Driven by the player's PlayerCommandInvoker (live) or a
+    /// ClonePlayback (replay) via GameClock — NOT by Unity's FixedUpdate — so the live
+    /// player and every clone run on the exact same deterministic tick timeline.
+    /// </summary>
+    public void Tick(int tick, float dt)
     {
+        // A backward tick means the clock was rewound — drop stale jump/suppress stamps so the
+        // restored body doesn't fire a phantom buffered jump or suppress grounding.
+        if (tick < currentTick) { lastJumpPressTick = int.MinValue; lastJumpedTick = int.MinValue; }
+        currentTick = tick;
+
+        // Stamp a freshly latched jump press with this tick.
+        if (jumpRequested) { lastJumpPressTick = tick; jumpRequested = false; }
+
         IsOnGround = CheckGrounded();
-        ApplyHorizontalMovement();
+        ApplyHorizontalMovement(dt);
         ApplyVariableGravity();
         TryJump();
         FireLandEvent();
     }
 
     private static readonly RaycastHit2D[] _groundHits = new RaycastHit2D[8];
-    private static readonly ContactFilter2D _groundFilter = new ContactFilter2D { useTriggers = false };
+    private ContactFilter2D _groundFilter; // configured once in Awake from groundLayer
 
     private bool CheckGrounded()
     {
         if (col == null) return false;
-        // Briefly suppress grounded-detection right after a jump, so the next
-        // FixedUpdate doesn't re-pin the player to the surface and clobber
-        // the jump's vertical velocity in ApplyHorizontalMovement.
-        if (Time.time - lastJumpedTime < postJumpGroundedSuppressTime) return false;
-
-        var filter = _groundFilter;
-        filter.useLayerMask = true;
-        filter.SetLayerMask(groundLayer);
+        // Briefly suppress grounded-detection right after a jump, so the next tick
+        // doesn't re-pin the player to the surface and clobber the jump's vertical
+        // velocity in ApplyHorizontalMovement.
+        if (lastJumpedTick != int.MinValue && currentTick >= lastJumpedTick
+            && currentTick - lastJumpedTick < groundSuppressTicks) return false;
 
         // BoxCast straight down from just inside the collider's bottom edge.
         // The cube-wide footprint catches slopes that touch the player's side, and
         // the cast gives us a surface normal in the same call.
         Bounds b = col.bounds;
         Vector2 origin = new(b.center.x, b.min.y + 0.01f);
-        int count = Physics2D.BoxCast(origin, groundCheckSize, 0f, Vector2.down, filter, _groundHits, groundCheckDistance + 0.01f);
+        int count = Physics2D.BoxCast(origin, groundCheckSize, 0f, Vector2.down, _groundFilter, _groundHits, groundCheckDistance + 0.01f);
 
         for (int i = 0; i < count; i++)
         {
@@ -121,7 +150,7 @@ public class PlayerController : MonoBehaviour
         return false;
     }
 
-    private void ApplyHorizontalMovement()
+    private void ApplyHorizontalMovement(float dt)
     {
         float targetSpeed = direction.x * moveSpeed;
         float rate = Mathf.Abs(direction.x) > 0f ? acceleration : deceleration;
@@ -138,13 +167,13 @@ public class PlayerController : MonoBehaviour
             // Project current velocity onto the tangent to get current speed
             // along the slope, then accelerate/decelerate toward target.
             float currentSpeed = Vector2.Dot(rb.linearVelocity, tangent);
-            float newSpeed = Mathf.MoveTowards(currentSpeed, targetSpeed, rate * Time.fixedDeltaTime);
+            float newSpeed = Mathf.MoveTowards(currentSpeed, targetSpeed, rate * dt);
             rb.linearVelocity = tangent * newSpeed;
         }
         else
         {
             // Airborne: just blend horizontal velocity, preserve Y for jump/fall.
-            float newX = Mathf.MoveTowards(rb.linearVelocity.x, targetSpeed, rate * Time.fixedDeltaTime);
+            float newX = Mathf.MoveTowards(rb.linearVelocity.x, targetSpeed, rate * dt);
             rb.linearVelocity = new Vector2(newX, rb.linearVelocity.y);
         }
     }
@@ -177,16 +206,15 @@ public class PlayerController : MonoBehaviour
 
     private void TryJump()
     {
-        if (jumpRequested && Time.time - lastJumpRequestTime > jumpBufferTime)
-            jumpRequested = false;
-
-        if (jumpRequested && IsOnGround)
+        bool buffered = lastJumpPressTick != int.MinValue && currentTick >= lastJumpPressTick
+                        && currentTick - lastJumpPressTick <= jumpBufferTicks;
+        if (buffered && IsOnGround)
         {
             rb.linearVelocity = new Vector2(rb.linearVelocity.x, jumpForce);
-            jumpRequested = false;
-            lastJumpedTime = Time.time;
-            // Immediately mark airborne so this FixedUpdate's FireLandEvent and
-            // the next FixedUpdate's CheckGrounded behave consistently.
+            lastJumpPressTick = int.MinValue;  // consume the buffered press
+            lastJumpedTick = currentTick;      // start the post-jump ground-suppress window
+            // Immediately mark airborne so this tick's FireLandEvent and the next
+            // tick's CheckGrounded behave consistently.
             IsOnGround = false;
             OnJumped?.Invoke();
         }
