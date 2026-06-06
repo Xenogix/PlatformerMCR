@@ -67,7 +67,7 @@ public sealed class RewindDirector : MonoBehaviour
         var srcRb = src.GetComponent<Rigidbody2D>();
 
         // Seed from the Rigidbody2D, NOT the Transform: right after a rewind the rigidbody holds
-        // the restored state@target, but the transform doesn't sync until the next physics step.
+        // the restored state@target, but the transform doesn't sync until the next physics tick.
         Vector2 seedPos = srcRb != null ? srcRb.position : (Vector2)src.transform.position;
         float seedRot = srcRb != null ? srcRb.rotation : src.transform.eulerAngles.z;
 

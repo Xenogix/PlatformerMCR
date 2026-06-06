@@ -2,8 +2,8 @@ using System.Collections.Generic;
 using UnityEngine;
 
 /// <summary>
-/// Single source of "game time", advancing in fixed steps. Each FixedUpdate it ticks two
-/// groups with the same integer tick index, then increments it:
+/// Single source of "game time", advancing one fixed tick per FixedUpdate. Each tick it runs
+/// two groups with the same integer tick index, then increments it:
 ///   1. MOVERS (player invoker, clone playbacks) — set velocities for this tick.
 ///   2. OBSERVERS (the rewind caretaker) — run AFTER the movers, so they capture this tick's
 ///      post-move state.
@@ -30,7 +30,7 @@ public class GameClock : MonoBehaviour
         }
     }
 
-    /// <summary>The current fixed-step tick index. Starts at 0, increments after each step.</summary>
+    /// <summary>The current fixed tick index. Starts at 0, increments after each tick.</summary>
     public int Tick { get; private set; }
 
     /// <summary>Convert a duration in seconds to a count of fixed ticks (min 1) — the single

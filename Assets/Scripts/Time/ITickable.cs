@@ -1,5 +1,5 @@
 /// <summary>
-/// Implemented by anything that must advance on the deterministic, fixed-step
+/// Implemented by anything that must advance on the deterministic, fixed-tick
 /// timeline driven by <see cref="GameClock"/>. The same <paramref name="tick"/>
 /// index is replayed onto clones so recorded commands reproduce exactly.
 /// </summary>

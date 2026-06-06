@@ -60,7 +60,7 @@ public class ClonePlayback : MonoBehaviour, ITickable
             // (sparse recording; the slice re-established the sticky state at its start).
         }
 
-        // Step physics every tick so the echo settles naturally under gravity.
+        // Advance physics every tick so the echo settles naturally under gravity.
         controller.Tick(tick, dt);
     }
 }
