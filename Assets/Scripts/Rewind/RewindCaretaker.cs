@@ -12,7 +12,7 @@ public sealed class RewindCaretaker : MonoBehaviour, ITickable
     public static RewindCaretaker Instance { get; private set; }
 
     [Tooltip("Capture a snapshot every N fixed ticks (~0.1s at 50Hz => 5).")]
-    [SerializeField, Min(1)] private int captureEveryNSteps = 5;
+    [SerializeField, Min(1)] private int captureRate = 5;
 
     [Tooltip("How far back a single rewind jumps, in seconds.")]
     [SerializeField, Min(0f)] private float rewindOffsetSeconds = 3f;
@@ -59,7 +59,7 @@ public sealed class RewindCaretaker : MonoBehaviour, ITickable
     // Post-tick: capture the whole world on the capture cadence, after the movers moved.
     public void Tick(int tick, float dt)
     {
-        if (tick % captureEveryNSteps == 0 && tick != _lastCapturedTick)
+        if (tick % captureRate == 0 && tick != _lastCapturedTick)
             CaptureAll(tick);
     }
 
@@ -102,7 +102,7 @@ public sealed class RewindCaretaker : MonoBehaviour, ITickable
         if (!_hasCaptured) return -1;
         int now = GameClock.Instance.Tick;
         int target = now - _offsetTicks;
-        target -= ((target % captureEveryNSteps) + captureEveryNSteps) % captureEveryNSteps; // snap down to a capture tick
+        target -= ((target % captureRate) + captureRate) % captureRate; // snap down to a capture tick
         if (target < _firstCapturedTick) target = _firstCapturedTick;
         RewindTo(target);
         return target;
