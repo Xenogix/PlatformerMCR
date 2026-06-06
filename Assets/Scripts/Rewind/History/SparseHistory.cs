@@ -9,8 +9,6 @@ public sealed class SparseHistory<T> : IHistory<T> where T : struct, IEquatable<
     private readonly List<int> _ticks = new();
     private readonly List<T> _values = new();
 
-    public int Count => _ticks.Count;
-
     // Tick of the most recent entry, or int.MinValue if empty. Used by reclamation:
     // a dormant entity whose last alive-change is at/before the window start can
     // never be revived again, so it can be destroyed.
@@ -35,8 +33,6 @@ public sealed class SparseHistory<T> : IHistory<T> where T : struct, IEquatable<
         _ticks.Add(tick);
         _values.Add(value);
     }
-
-    public T ValueAt(int tick) => _values[FloorIndex(tick)];
 
     public bool TryValueAt(int tick, out T value)
     {

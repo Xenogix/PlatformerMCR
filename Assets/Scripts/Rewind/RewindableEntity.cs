@@ -19,8 +19,6 @@ public sealed class RewindableEntity : MonoBehaviour
     private bool _registered;
     private bool _dormant;
 
-    public bool IsDormant => _dormant;
-
     private void Awake()
     {
         _channels = GetComponentsInChildren<IRewindChannel>(includeInactive: true);

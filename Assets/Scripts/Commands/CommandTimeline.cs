@@ -21,7 +21,6 @@ public class CommandTimeline
     private readonly List<TickRecord> frames = new List<TickRecord>(); // change ticks only
     private int recordingEndTick = int.MinValue;                       // last recorded tick = the present
 
-    public int FirstTick => frames.Count == 0 ? int.MaxValue : frames[0].Tick;
     public int LastTick => recordingEndTick; // recording extent (for retire), not the last change
 
     /// <summary>Advance the recording to `tick`, appending a record only if something changed.</summary>

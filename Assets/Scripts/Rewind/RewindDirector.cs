@@ -22,7 +22,7 @@ public sealed class RewindDirector : MonoBehaviour
     [Tooltip("Echo mass as a fraction of the player's, so the player shoves echoes around weightlessly.")]
     [SerializeField, Range(0.01f, 1f)] private float echoMassFactor = 0.2f;
 
-    [Tooltip("Echo prefab — a Player variant carrying ClonePlayback + RigidbodyChannel + RewindableEntity and NO PlayerCommandInvoker (translucent). If unset, falls back to cloning the live player.")]
+    [Tooltip("Echo prefab (required) — a Player variant carrying ClonePlayback + RigidbodyChannel + RewindableEntity and NO PlayerCommandInvoker (translucent).")]
     [SerializeField] private GameObject echoPrefab;
 
     private PlayerCommandInvoker livePlayer;
@@ -57,24 +57,24 @@ public sealed class RewindDirector : MonoBehaviour
 
     private void SpawnEcho(CommandTimeline script, int spawnTick)
     {
+        if (echoPrefab == null)
+        {
+            Debug.LogError("RewindDirector: echoPrefab is not assigned — cannot spawn an echo.");
+            return;
+        }
+
         GameObject src = livePlayer.gameObject;
         var srcRb = src.GetComponent<Rigidbody2D>();
 
-        // Seed from the Rigidbody2D, NOT the Transform: right after a rewind the rigidbody
-        // holds the restored state@target, but the transform doesn't sync until the next
-        // physics step.
+        // Seed from the Rigidbody2D, NOT the Transform: right after a rewind the rigidbody holds
+        // the restored state@target, but the transform doesn't sync until the next physics step.
         Vector2 seedPos = srcRb != null ? srcRb.position : (Vector2)src.transform.position;
         float seedRot = srcRb != null ? srcRb.rotation : src.transform.eulerAngles.z;
 
-        var pos = new Vector3(seedPos.x, seedPos.y, src.transform.position.z);
-        var rot = Quaternion.Euler(0f, 0f, seedRot);
-        GameObject echo = echoPrefab != null ? Instantiate(echoPrefab, pos, rot) : Instantiate(src, pos, rot);
+        GameObject echo = Instantiate(echoPrefab,
+            new Vector3(seedPos.x, seedPos.y, src.transform.position.z),
+            Quaternion.Euler(0f, 0f, seedRot));
         echo.name = "Echo";
-
-        // An echo must not read live input. The dedicated prefab has no invoker; if we fell
-        // back to cloning the live player, strip it here.
-        var invoker = echo.GetComponent<PlayerCommandInvoker>();
-        if (invoker != null) Destroy(invoker);
 
         var echoRb = echo.GetComponent<Rigidbody2D>();
         if (srcRb != null && echoRb != null)
@@ -86,9 +86,7 @@ public sealed class RewindDirector : MonoBehaviour
             echoRb.mass = srcRb.mass * echoMassFactor; // weightless-ish: the player shoves it around
         }
 
-        var playback = echo.GetComponent<ClonePlayback>();
-        if (playback == null) playback = echo.AddComponent<ClonePlayback>();
-        playback.Play(script);
+        echo.GetComponent<ClonePlayback>().Play(script);
 
         // Register + capture NOW at spawnTick (a capture-cadence tick) so the echo has an
         // alive record from the moment it exists — otherwise an immediate second rewind to
