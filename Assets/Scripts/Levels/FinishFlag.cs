@@ -15,9 +15,16 @@ public class FinishFlag : MonoBehaviour
     private void OnTriggerEnter2D(Collider2D other)
     {
         if (hasTriggered) return;
-        
+
         if (other.GetComponentInParent<Player>() == null) return;
         hasTriggered = true;
-        LevelLoader.LoadNext();
+
+        // Route through the level transition (static "channel change" outro) if present;
+        // otherwise fall back to loading the next level directly.
+        var transition = FindAnyObjectByType<LevelTransition>();
+        if (transition != null)
+            transition.PlayOutroThenLoad(LevelLoader.LoadNext);
+        else
+            LevelLoader.LoadNext();
     }
 }
