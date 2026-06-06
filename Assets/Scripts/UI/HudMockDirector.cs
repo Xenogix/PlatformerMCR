@@ -27,6 +27,7 @@ public class HudMockDirector : MonoBehaviour
     private int _activeLane = -1;
     private int _cloneCount;
     private float _playhead;
+    private bool _selecting;
 
     private void Awake()
     {
@@ -38,8 +39,28 @@ public class HudMockDirector : MonoBehaviour
         if (hud == null) return;
         hud.SetTransport(TransportState.Pause);
         if (hud.Timeline != null)
+        {
             _activeLane = hud.Timeline.AddLane("P1", PlayerColor);
+            hud.Timeline.LaneSubmitted += OnLaneSubmitted;
+            hud.Timeline.NewTimelineSubmitted += OnNewTimelineSubmitted;
+        }
+
+        // Hidden by default — shown only while "paused" (Tab), like the Director will do.
+        hud.SetTimelineVisible(false);
     }
+
+    private void OnDestroy()
+    {
+        if (hud != null && hud.Timeline != null)
+        {
+            hud.Timeline.LaneSubmitted -= OnLaneSubmitted;
+            hud.Timeline.NewTimelineSubmitted -= OnNewTimelineSubmitted;
+        }
+    }
+
+    // Stand-in for the Director's reaction to a selection. The real one loads/replays the clone.
+    private void OnLaneSubmitted(int lane) => hud.ShowToast($"LOAD LANE {lane}");
+    private void OnNewTimelineSubmitted() => hud.ShowToast("NEW TIMELINE");
 
     private void Update()
     {
@@ -56,6 +77,15 @@ public class HudMockDirector : MonoBehaviour
 
         var timeline = hud.Timeline;
         if (timeline == null) return;
+
+        // Simulate the pause menu: Tab toggles the timeline. When shown, focus goes to it so
+        // navigation (arrows / D-pad / stick) and Submit (Enter / A) are handled by the EventSystem.
+        if (kb.tabKey.wasPressedThisFrame)
+        {
+            _selecting = !_selecting;
+            hud.SetTimelineVisible(_selecting);
+            if (_selecting) timeline.FocusSelection();
+        }
 
         if (kb.eKey.wasPressedThisFrame && _activeLane >= 0) timeline.AddEvent(_activeLane, _playhead);
         if (kb.backspaceKey.wasPressedThisFrame) ResetTimeline();
@@ -95,9 +125,10 @@ public class HudMockDirector : MonoBehaviour
     private void OnGUI()
     {
         if (!showLegend) return;
-        GUI.Label(new Rect(10, 10, 640, 80),
+        GUI.Label(new Rect(10, 10, 680, 96),
             "HUD MOCK  —  1 Play   2 Pause   3 Rewind   4 Record\n" +
             "C clone (+toast)   S save toast   E event tick\n" +
-            "←/→ scrub playhead   Backspace reset timeline");
+            "←/→ scrub playhead   Backspace reset timeline\n" +
+            "Tab focus timeline   ↑/↓ navigate   Enter/A select   (needs an EventSystem)");
     }
 }

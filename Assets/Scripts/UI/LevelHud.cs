@@ -51,6 +51,13 @@ public class LevelHud : MonoBehaviour
     public ActionTimeline Timeline => timeline;
     public TransportState Transport => _transport;
 
+    // Show/hide the whole timeline (the Director shows it on pause so the player can pick a clone to
+    // add or replay, and hides it during play to free up the screen).
+    public void SetTimelineVisible(bool visible)
+    {
+        if (timeline != null) timeline.SetVisible(visible);
+    }
+
     private Level _level;
     private TransportState _transport = TransportState.Pause;
     private Coroutine _toastRoutine;

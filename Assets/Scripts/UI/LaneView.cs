@@ -20,6 +20,12 @@ public class LaneView : MonoBehaviour
     [SerializeField] private RectTransform track;
     [Tooltip("Optional disabled marker cloned for each event. Leave empty to skip ticks.")]
     [SerializeField] private RectTransform tickTemplate;
+    [Tooltip("Optional Button on the lane root, so the lane can be focused/selected (pause menu).")]
+    [SerializeField] private Button button;
+
+    // The lane's selectable, used by ActionTimeline for keyboard/gamepad navigation. Null if the
+    // lane isn't meant to be selectable.
+    public Button Button => button;
 
     public void SetLabel(string text)
     {
