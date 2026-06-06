@@ -3,7 +3,7 @@ using UnityEngine;
 
 // The Caretaker: owns the registry of rewindable entities, the capture cadence, and
 // the instant jump-back. It no longer owns a clock — it rides GameClock as a POST-tick
-// observer (ticked after the movers each fixed step) so it captures the post-move state
+// observer (ticked after the movers each fixed tick) so it captures the post-move state
 // of each tick. Input + clone spawning live in the RewindDirector, which calls Rewind()
 // and uses the returned target tick to seed/echo a clone. It never inspects memento
 // contents.
@@ -116,6 +116,6 @@ public sealed class RewindCaretaker : MonoBehaviour, ITickable
             _entities[i].DiscardAfter(target);
         }
         GameClock.Instance.RewindTo(target);
-        _lastCapturedTick = target; // target's state is already recorded; don't re-capture it next step
+        _lastCapturedTick = target; // target's state is already recorded; don't re-capture it next tick
     }
 }

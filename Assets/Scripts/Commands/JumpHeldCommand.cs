@@ -1,8 +1,8 @@
 /// <summary>
-/// Reports whether the jump button is currently held. Emitted every tick because the
-/// held state drives variable jump height (releasing early gives a shorter jump). A
-/// clone must receive the same held state each tick or its jump arc would differ from
-/// past-you's.
+/// Reports whether the jump button is currently held — this drives variable jump height
+/// (releasing early gives a shorter jump). A sticky command: emitted only when the held
+/// state CHANGES (press/release) and carried forward in between, so a replaying clone's
+/// jump arc matches past-you's without needing a command every tick.
 /// </summary>
 public class JumpHeldCommand : IStickyCommand
 {

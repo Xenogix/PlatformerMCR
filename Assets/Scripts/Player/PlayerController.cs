@@ -39,11 +39,11 @@ public class PlayerController : MonoBehaviour
     private float baseGravityScale = 1f;
     private Vector2 groundNormal = Vector2.up;
 
-    // Time-based timers (Time.time) were replaced by fixed-tick counters so the
-    // controller is rewind-safe and replay-stable: Time.time keeps marching forward
-    // across a rewind, but these counters move with the clock, and a clone replaying
-    // the same commands reproduces the same jumps. The two seconds-durations are
-    // converted to tick counts once in Awake (fixed timestep is constant).
+    // Jump buffering / ground-suppress use fixed-tick timing (not Time.time) so they're
+    // rewind-safe and replay-stable: Time.time keeps marching forward across a rewind, but
+    // tick-based timing moves with the clock, and a clone replaying the same commands
+    // reproduces the same jumps. The two seconds-durations are converted to tick window
+    // lengths once in Awake (the fixed timestep is constant).
     private const float PostJumpGroundedSuppressSeconds = 0.1f;
     private int jumpBufferTicks;     // jump-buffer window length, in ticks
     private int groundSuppressTicks; // post-jump ground-suppress window length, in ticks
@@ -95,9 +95,9 @@ public class PlayerController : MonoBehaviour
     }
 
     /// <summary>
-    /// Advance one fixed step. Driven by the player's PlayerCommandInvoker (live) or a
+    /// Advance one fixed tick. Driven by the player's PlayerCommandInvoker (live) or a
     /// ClonePlayback (replay) via GameClock — NOT by Unity's FixedUpdate — so the live
-    /// player and every clone step on the exact same deterministic tick timeline.
+    /// player and every clone run on the exact same deterministic tick timeline.
     /// </summary>
     public void Tick(int tick, float dt)
     {

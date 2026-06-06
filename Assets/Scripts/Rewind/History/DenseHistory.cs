@@ -1,7 +1,7 @@
 using System;
 using System.Collections.Generic;
 
-// Dense per-tick history for REGULAR-cadence capture (constant tick step, as the
+// Dense per-tick history for REGULAR-cadence capture (constant tick spacing, as the
 // RewindCaretaker produces). Stores ONLY values; the tick of entry i is
 // _baseTick + i*_step, so lookup is O(1) index arithmetic and no per-entry tick
 // is stored. Out-of-range queries clamp to the earliest/latest entry.

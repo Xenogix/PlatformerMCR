@@ -1,8 +1,9 @@
 using UnityEngine;
 
 /// <summary>
-/// Sets the player's movement direction for this tick. Emitted every tick (the
-/// direction may be <see cref="Vector2.zero"/>) so replay reproduces movement exactly.
+/// Sets the player's movement direction. A sticky command: emitted only when the
+/// direction CHANGES and carried forward in between, so replay reproduces movement
+/// exactly without a command every tick.
 /// </summary>
 public class MoveCommand : IStickyCommand
 {
