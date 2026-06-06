@@ -2118,6 +2118,10 @@ PrefabInstance:
       propertyPath: m_hasFontAssetChanged
       value: 0
       objectReference: {fileID: 0}
+    - target: {fileID: 3168390074846646027, guid: eb84d052cd3b21444ad438b6e2ac9df0, type: 3}
+      propertyPath: m_LocalPosition.z
+      value: 0
+      objectReference: {fileID: 0}
     - target: {fileID: 3328988894466799920, guid: eb84d052cd3b21444ad438b6e2ac9df0, type: 3}
       propertyPath: m_ClearFlags
       value: 1
@@ -2228,6 +2232,10 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 7439697881815893936, guid: eb84d052cd3b21444ad438b6e2ac9df0, type: 3}
       propertyPath: m_LocalEulerAnglesHint.z
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 7455990017809704451, guid: eb84d052cd3b21444ad438b6e2ac9df0, type: 3}
+      propertyPath: m_SizeDelta.y
       value: 0
       objectReference: {fileID: 0}
     - target: {fileID: 7697594859950656151, guid: eb84d052cd3b21444ad438b6e2ac9df0, type: 3}
