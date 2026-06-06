@@ -11,10 +11,12 @@ GameObject:
   - component: {fileID: 5510911281766284661}
   - component: {fileID: 679522063357572544}
   - component: {fileID: 8831654949185616336}
-  - component: {fileID: 2585045916330304231}
-  - component: {fileID: 4680303604209653667}
   - component: {fileID: 7785516961323507122}
   - component: {fileID: 2014986075053325113}
+  - component: {fileID: 4680303604209653667}
+  - component: {fileID: 7182808959247029801}
+  - component: {fileID: 7804278579294951031}
+  - component: {fileID: 2585045916330304231}
   - component: {fileID: 8136204493583721912}
   m_Layer: 0
   m_Name: Player
@@ -31,8 +33,8 @@ Transform:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 2227488959991407352}
   serializedVersion: 2
-  m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
-  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 8.62, y: 22.09, z: 0}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
@@ -80,7 +82,7 @@ MeshRenderer:
   m_LightProbeVolumeOverride: {fileID: 0}
   m_ScaleInLightmap: 1
   m_ReceiveGI: 1
-  m_PreserveUVs: 0
+  m_PreserveUVs: 1
   m_IgnoreNormalsForChartDetection: 0
   m_ImportantGI: 0
   m_StitchLightmapSeams: 1
@@ -95,42 +97,6 @@ MeshRenderer:
   m_SortingOrder: 0
   m_MaskInteraction: 0
   m_AdditionalVertexStreams: {fileID: 0}
---- !u!114 &2585045916330304231
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 2227488959991407352}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: a306133ad36fbd143ace4666c6f879a3, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::Player
---- !u!114 &4680303604209653667
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 2227488959991407352}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: c23cb169e870cf2488b3dfaa825525a1, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::PlayerController
-  moveSpeed: 8
-  acceleration: 50
-  deceleration: 35
-  jumpForce: 25
-  jumpBufferTime: 0.1
-  fallGravityMultiplier: 7
-  groundLayer:
-    serializedVersion: 2
-    m_Bits: 4294967295
-  groundCheckSize: {x: 1, y: 0.1}
-  groundCheckDistance: 0.05
-  maxSlopeAngle: 60
 --- !u!50 &7785516961323507122
 Rigidbody2D:
   serializedVersion: 5
@@ -146,7 +112,7 @@ Rigidbody2D:
   m_Mass: 1
   m_LinearDamping: 0
   m_AngularDamping: 0.05
-  m_GravityScale: 2
+  m_GravityScale: 4
   m_Material: {fileID: 0}
   m_IncludeLayers:
     serializedVersion: 2
@@ -168,7 +134,7 @@ BoxCollider2D:
   m_Enabled: 1
   serializedVersion: 3
   m_Density: 1
-  m_Material: {fileID: 6200000, guid: 834b008aae1549f89a90b6b0c30fff68, type: 2}
+  m_Material: {fileID: 6200000, guid: ed65010062b42f5a0ac9c2fccca8d074, type: 2}
   m_IncludeLayers:
     serializedVersion: 2
     m_Bits: 0
@@ -204,6 +170,68 @@ BoxCollider2D:
   m_AutoTiling: 0
   m_Size: {x: 1, y: 1}
   m_EdgeRadius: 0
+--- !u!114 &4680303604209653667
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2227488959991407352}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: c23cb169e870cf2488b3dfaa825525a1, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::PlayerController
+  moveSpeed: 8
+  acceleration: 50
+  deceleration: 35
+  jumpForce: 12
+  jumpBufferTime: 0.1
+  ascentGravityMultiplier: 1.5
+  lowJumpGravityMultiplier: 3
+  fallGravityMultiplier: 2.5
+  groundLayer:
+    serializedVersion: 2
+    m_Bits: 4294967295
+  groundCheckSize: {x: 1, y: 0.1}
+  groundCheckDistance: 0.05
+  maxSlopeAngle: 60
+--- !u!114 &7182808959247029801
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2227488959991407352}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 8b4685905569fe78dafdf5b60d9e1243, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::RigidbodyChannel
+--- !u!114 &7804278579294951031
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2227488959991407352}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: ea79afe99ab07406aa849a1f90b14a6e, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::RewindableEntity
+--- !u!114 &2585045916330304231
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2227488959991407352}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: a306133ad36fbd143ace4666c6f879a3, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::Player
 --- !u!114 &8136204493583721912
 MonoBehaviour:
   m_ObjectHideFlags: 0
