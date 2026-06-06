@@ -17,14 +17,12 @@ public class ClonePlayback : MonoBehaviour, ITickable
 {
     private Player player;
     private PlayerController controller;
-    private RewindableEntity rewindable;
     private CommandTimeline timeline;
 
     private void Awake()
     {
         player = GetComponent<Player>();
         controller = GetComponent<PlayerController>();
-        rewindable = GetComponent<RewindableEntity>();
     }
 
     /// <summary>Begin replaying the given recording (its frames carry absolute ticks).</summary>
@@ -42,23 +40,17 @@ public class ClonePlayback : MonoBehaviour, ITickable
 
     public void Tick(int tick, float dt)
     {
-        if (timeline != null)
-        {
-            if (tick > timeline.LastTick)
-            {
-                // Replayed the whole recording — caught up to the present. Retire via the
-                // lifecycle seam (Despawn = deactivate, revivable), NOT Entity.Kill, which is
-                // the gameplay-death path (hazards/out-of-bounds) and would fire death effects.
-                if (rewindable != null) rewindable.Despawn(); else gameObject.SetActive(false);
-                return;
-            }
+        // Past the end of the recording: the echo has replayed its whole [T, present] window.
+        // It does NOT loop and is NOT retired — it stays active and dynamic so gravity and
+        // collisions still apply, but we stop driving it from the recording, so it settles and
+        // freezes in place. It remains registered + captured, so a later rewind still snaps it.
+        if (timeline == null || tick > timeline.LastTick) return;
 
-            TickRecord record = timeline.GetAtTick(tick);
-            if (record != null)
-                foreach (ICommand cmd in record.Commands) cmd.Execute(player);
-            // else: nothing changed this tick — carry forward the controller's current state
-            // (sparse recording; the slice re-established the sticky state at its start).
-        }
+        TickRecord record = timeline.GetAtTick(tick);
+        if (record != null)
+            foreach (ICommand cmd in record.Commands) cmd.Execute(player);
+        // else: nothing changed this tick — carry forward the controller's current state
+        // (sparse recording; the slice re-established the sticky state at its start).
 
         // Advance physics every tick so the echo settles naturally under gravity.
         controller.Tick(tick, dt);

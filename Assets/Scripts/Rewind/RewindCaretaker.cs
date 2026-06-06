@@ -29,6 +29,12 @@ public sealed class RewindCaretaker : MonoBehaviour, ITickable
 
     public int CurrentTick => GameClock.HasInstance ? GameClock.Instance.Tick : 0;
 
+    /// <summary>True once at least one snapshot has been captured (scrubbing is possible).</summary>
+    public bool HasCaptured => _hasCaptured;
+
+    /// <summary>Earliest tick still in history — the left edge of the scrub window.</summary>
+    public int FirstCapturedTick => _firstCapturedTick;
+
     private void Awake()
     {
         if (Instance != null && Instance != this) { Destroy(this); return; }
@@ -93,29 +99,54 @@ public sealed class RewindCaretaker : MonoBehaviour, ITickable
     }
 
     /// <summary>
-    /// Jump the world back by rewindOffsetSeconds (snapped down to a capture tick, clamped
-    /// to the first captured tick) and return the resolved target tick — or -1 if nothing
-    /// has been captured yet. The Director uses the target to seed/echo a clone.
+    /// Snap an arbitrary tick to a valid rewind target: down to the nearest capture tick,
+    /// clamped to [firstCaptured, now]. Only capture ticks carry snapshots, so both Preview
+    /// and Commit address the world through this.
     /// </summary>
-    public int Rewind()
+    public int SnapToCapture(int tick)
     {
-        if (!_hasCaptured) return -1;
-        int now = GameClock.Instance.Tick;
-        int target = now - _offsetTicks;
-        target -= ((target % captureRate) + captureRate) % captureRate; // snap down to a capture tick
-        if (target < _firstCapturedTick) target = _firstCapturedTick;
-        RewindTo(target);
-        return target;
+        int now = GameClock.HasInstance ? GameClock.Instance.Tick : 0;
+        if (tick > now) tick = now;
+        tick -= ((tick % captureRate) + captureRate) % captureRate; // snap down to a capture tick
+        if (tick < _firstCapturedTick) tick = _firstCapturedTick;
+        return tick;
     }
 
-    private void RewindTo(int target)
+    /// <summary>
+    /// Non-destructive scrub: restore every entity's visible state to `tick` WITHOUT touching
+    /// history (no DiscardAfter), the clock, or the capture cursor — so the player can sweep the
+    /// playhead back and forth and Cancel by previewing the present. Called while paused.
+    /// </summary>
+    public void Preview(int tick)
     {
+        if (!_hasCaptured) return;
+        tick = SnapToCapture(tick);
+        for (int i = 0; i < _entities.Count; i++) _entities[i].RestoreTo(tick);
+        Physics2D.SyncTransforms(); // align colliders with the restored poses while paused
+    }
+
+    /// <summary>
+    /// Commit a rewind to `tick`: restore + discard post-tick history on every entity and wind
+    /// the clock back, so the world resumes forward from there. Returns the resolved (snapped)
+    /// target, or -1 if nothing has been captured yet. The Director uses it to seed/echo a clone.
+    /// </summary>
+    public int Commit(int tick)
+    {
+        if (!_hasCaptured) return -1;
+        tick = SnapToCapture(tick);
         for (int i = 0; i < _entities.Count; i++)
         {
-            _entities[i].RestoreTo(target);
-            _entities[i].DiscardAfter(target);
+            _entities[i].RestoreTo(tick);
+            _entities[i].DiscardAfter(tick);
         }
-        GameClock.Instance.RewindTo(target);
-        _lastCapturedTick = target; // target's state is already recorded; don't re-capture it next tick
+        GameClock.Instance.RewindTo(tick);
+        _lastCapturedTick = tick; // target's state is already recorded; don't re-capture it next tick
+        return tick;
     }
+
+    /// <summary>
+    /// Legacy instant jump-back by rewindOffsetSeconds. Kept for the old single-key path;
+    /// the timeline flow uses Preview + Commit with a player-chosen tick instead.
+    /// </summary>
+    public int Rewind() => _hasCaptured ? Commit(GameClock.Instance.Tick - _offsetTicks) : -1;
 }

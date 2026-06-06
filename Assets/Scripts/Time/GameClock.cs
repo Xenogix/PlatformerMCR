@@ -33,6 +33,20 @@ public class GameClock : MonoBehaviour
     /// <summary>The current fixed tick index. Starts at 0, increments after each tick.</summary>
     public int Tick { get; private set; }
 
+    /// <summary>True while game time is frozen (e.g. the timeline is open for scrubbing).</summary>
+    public bool IsPaused { get; private set; }
+
+    /// <summary>
+    /// Freeze/unfreeze game time. Sets <see cref="Time.timeScale"/> to 0/1 so Unity's own
+    /// physics auto-simulation and FixedUpdate stop too (otherwise rigidbodies keep falling
+    /// while we scrub). UI animations use unscaled time, so they keep running while paused.
+    /// </summary>
+    public void SetPaused(bool paused)
+    {
+        IsPaused = paused;
+        Time.timeScale = paused ? 0f : 1f;
+    }
+
     /// <summary>Convert a duration in seconds to a count of fixed ticks (min 1) — the single
     /// home for the seconds→ticks rule used by jump buffers, rewind offsets, and windows.</summary>
     public static int SecondsToTicks(float seconds) => Mathf.Max(1, Mathf.RoundToInt(seconds / Time.fixedDeltaTime));
@@ -65,6 +79,7 @@ public class GameClock : MonoBehaviour
 
     private void FixedUpdate()
     {
+        if (IsPaused) return; // frozen while scrubbing; timeScale 0 already stops this, kept explicit
         float dt = Time.fixedDeltaTime;
         _movers.Tick(Tick, dt);
         _observers.Tick(Tick, dt);
