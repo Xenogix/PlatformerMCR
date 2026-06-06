@@ -1628,6 +1628,8 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::RewindDirector
   rewindKey: 32
+  echoMassFactor: 0.2
+  echoPrefab: {fileID: 6310006914698530879, guid: 83530c5dddf64df6f82d712c3afb5c92, type: 3}
 --- !u!4 &942451608 stripped
 Transform:
   m_CorrespondingSourceObject: {fileID: 7715684241911181976, guid: 97cafb89d5246df4d9aa55b7afba4129, type: 3}
