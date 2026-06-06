@@ -3,11 +3,14 @@ using UnityEngine;
 using UnityEngine.InputSystem;
 
 /// <summary>
-/// Routes the rewind input and orchestrates echoes — the production replacement for
-/// bene's throwaway CloneTestDriver. On the rewind key it asks the Caretaker to jump the
-/// world back (Memento), then splits the live player's recorded command stream at the
-/// target tick T: the frozen [T, now] slice drives a freshly spawned echo (Command
-/// replay), while the live player re-records forward from T.
+/// Drives the timeline-scrub clone flow and orchestrates echoes. While playing, the
+/// Timeline input opens the timeline and PAUSES the game (GameClock + timeScale 0). The
+/// player then scrubs a playhead with Move-X: each frame the Caretaker PREVIEWS the world
+/// at the scrub tick (non-destructive restore) so the level visibly winds back and forth.
+/// Pressing Jump CONFIRMS: the Caretaker commits the rewind to the chosen tick T and the
+/// live player's recorded command stream is split there — the frozen [T, now] slice drives
+/// a freshly spawned echo (Command replay) while the live player re-records forward from T.
+/// Pressing Timeline again cancels (previews the present) and resumes.
 ///
 /// The echo is a copy of the just-restored player, seeded at the player's exact state@T,
 /// and made weightless (low mass) so the player can shove it around; collisions with the
@@ -16,8 +19,7 @@ using UnityEngine.InputSystem;
 /// </summary>
 public sealed class RewindDirector : MonoBehaviour
 {
-    [Tooltip("Key that triggers the instant jump-back and spawns an echo.")]
-    [SerializeField] private Key rewindKey = Key.R;
+    private enum Mode { Playing, Scrubbing }
 
     [Tooltip("Echo mass as a fraction of the player's, so the player shoves echoes around weightlessly.")]
     [SerializeField, Range(0.01f, 1f)] private float echoMassFactor = 0.2f;
@@ -25,26 +27,125 @@ public sealed class RewindDirector : MonoBehaviour
     [Tooltip("Echo prefab (required) — a Player variant carrying ClonePlayback + RigidbodyChannel + RewindableEntity and NO PlayerCommandInvoker (translucent).")]
     [SerializeField] private GameObject echoPrefab;
 
+    [Tooltip("Playhead scrub speed, in game ticks per real second of held Move-X.")]
+    [SerializeField, Min(1f)] private float scrubTicksPerSecond = 30f;
+
+    [Tooltip("Lane colour used for each clone added to the timeline.")]
+    [SerializeField] private Color cloneColor = new(1f, 0.78f, 0.45f);
+
+    [Tooltip("Lane colour for the live player's own lane (P1).")]
+    [SerializeField] private Color playerColor = new(0.55f, 0.9f, 1f);
+
     private PlayerCommandInvoker livePlayer;
+    private LevelHud hud;
 
-    private void Start() => livePlayer = FindAnyObjectByType<PlayerCommandInvoker>();
+    private InputAction timelineAction; // open, then commit the rewind to the scrub point
+    private InputAction moveAction;     // X axis scrubs the playhead
+    private InputAction jumpAction;     // commits the rewind AND spawns a clone
+    private InputAction cancelAction;   // aborts the scrub, returning to the present
 
-    private void Update()
+    private Mode mode = Mode.Playing;
+    private float scrubTickF; // fractional accumulator for a smooth scrub
+    private int scrubTick;
+    private int playerLane = -1; // P1's timeline lane
+
+    private void Start()
     {
-        var kb = Keyboard.current;
-        if (kb != null && kb[rewindKey].wasPressedThisFrame)
-            Rewind();
+        livePlayer = FindAnyObjectByType<PlayerCommandInvoker>();
+        hud = FindAnyObjectByType<LevelHud>();
+
+        timelineAction = InputSystem.actions.FindAction("Timeline");
+        moveAction = InputSystem.actions.FindAction("Move");
+        jumpAction = InputSystem.actions.FindAction("Jump");
+        cancelAction = InputSystem.actions.FindAction("Cancel"); // optional
+        if (timelineAction == null)
+            Debug.LogError("RewindDirector: 'Timeline' input action not found — add it to the project-wide actions.");
+
+        hud?.SetTransport(TransportState.Play);
+        hud?.SetTimelineVisible(false); // shown only while the timeline is open for scrubbing
+        if (hud != null && hud.Timeline != null) playerLane = hud.Timeline.AddLane("P1", playerColor);
     }
 
-    private void Rewind()
+    // Runs in real time (unscaled), so it keeps working while the game is paused for scrubbing.
+    private void Update()
     {
-        // Re-resolve in case the player was respawned or the scene reloaded.
-        if (livePlayer == null) livePlayer = FindAnyObjectByType<PlayerCommandInvoker>();
-        var caretaker = RewindCaretaker.Instance;
-        if (caretaker == null || livePlayer == null) return;
+        bool togglePressed = timelineAction != null && timelineAction.WasPressedThisFrame();
 
-        int target = caretaker.Rewind();
-        if (target < 0) return; // nothing captured yet
+        if (mode == Mode.Playing)
+        {
+            if (togglePressed) EnterScrub();
+            return;
+        }
+
+        // Scrubbing.
+        var caretaker = RewindCaretaker.Instance;
+        if (caretaker == null) { Resume(); return; }
+
+        int now = GameClock.Instance.Tick;
+        int first = caretaker.FirstCapturedTick;
+
+        float moveX = moveAction != null ? moveAction.ReadValue<Vector2>().x : 0f;
+        scrubTickF = Mathf.Clamp(scrubTickF + moveX * scrubTicksPerSecond * Time.unscaledDeltaTime, first, now);
+        scrubTick = caretaker.SnapToCapture(Mathf.RoundToInt(scrubTickF));
+
+        caretaker.Preview(scrubTick);
+
+        if (hud != null && hud.Timeline != null)
+        {
+            float span = Mathf.Max(1, now - first);
+            float t01 = (scrubTick - first) / span;
+            hud.Timeline.SetPlayhead(t01);
+            if (playerLane >= 0) hud.Timeline.SetLaneProgress(playerLane, t01);
+        }
+
+        // Jump = rewind here AND leave a clone; Timeline (Tab) = rewind here with no clone;
+        // Cancel (Esc) = abort and snap back to the present.
+        if (jumpAction != null && jumpAction.WasPressedThisFrame()) ConfirmClone();
+        else if (togglePressed) ConfirmRewind();
+        else if (cancelAction != null && cancelAction.WasPressedThisFrame()) CancelScrub();
+    }
+
+    private void EnterScrub()
+    {
+        var caretaker = RewindCaretaker.Instance;
+        if (livePlayer == null) livePlayer = FindAnyObjectByType<PlayerCommandInvoker>();
+        if (caretaker == null || !caretaker.HasCaptured || livePlayer == null) return;
+
+        mode = Mode.Scrubbing;
+        scrubTickF = scrubTick = GameClock.Instance.Tick;
+        GameClock.Instance.SetPaused(true);
+        hud?.SetTimelineVisible(true);
+        hud?.SetTransport(TransportState.Rewind);
+    }
+
+    private void CancelScrub()
+    {
+        RewindCaretaker.Instance?.Preview(GameClock.Instance.Tick); // restore the present
+        Resume();
+    }
+
+    // Commit the rewind to the scrub point WITHOUT spawning a clone: the world stays in the past
+    // and the live player resumes recording forward from there (the discarded future is gone).
+    private void ConfirmRewind()
+    {
+        var caretaker = RewindCaretaker.Instance;
+        if (caretaker == null || livePlayer == null) { CancelScrub(); return; }
+
+        int target = caretaker.Commit(scrubTick);
+        if (target < 0) { CancelScrub(); return; }
+
+        // The live player keeps only [.., target] and re-records forward from target+1.
+        livePlayer.Timeline.TruncateAfterTick(target);
+        Resume();
+    }
+
+    private void ConfirmClone()
+    {
+        var caretaker = RewindCaretaker.Instance;
+        if (caretaker == null || livePlayer == null) { CancelScrub(); return; }
+
+        int target = caretaker.Commit(scrubTick);
+        if (target < 0) { CancelScrub(); return; }
 
         // Command-side split, addressed by ABSOLUTE tick (mirror of the caretaker's state
         // DiscardAfter, opposite retention): the echo keeps a frozen [target, now] copy; the
@@ -53,6 +154,18 @@ public sealed class RewindDirector : MonoBehaviour
         livePlayer.Timeline.TruncateAfterTick(target - 1);
 
         SpawnEcho(echoScript, target);
+
+        hud?.Timeline?.AddLane("CLONE", cloneColor);
+        hud?.ShowToast("CLONE CREATED");
+        Resume();
+    }
+
+    private void Resume()
+    {
+        mode = Mode.Playing;
+        hud?.SetTimelineVisible(false);
+        hud?.SetTransport(TransportState.Play);
+        GameClock.Instance.SetPaused(false);
     }
 
     private void SpawnEcho(CommandTimeline script, int spawnTick)
@@ -87,6 +200,8 @@ public sealed class RewindDirector : MonoBehaviour
         }
 
         echo.GetComponent<ClonePlayback>().Play(script);
+        Debug.Log($"[RewindDirector] Echo spawned at tick {spawnTick}, replay window [{spawnTick}..{script.LastTick}] = {script.LastTick - spawnTick} ticks. " +
+                  $"It replays your recorded actions for that window, then freezes in place (stays visible).");
 
         // Register + capture NOW at spawnTick (a capture-cadence tick) so the echo has an
         // alive record from the moment it exists — otherwise an immediate second rewind to
