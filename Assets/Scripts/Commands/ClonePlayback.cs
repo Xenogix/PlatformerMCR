@@ -53,16 +53,9 @@ public class ClonePlayback : MonoBehaviour, ITickable
 
             TickRecord record = timeline.GetAtTick(tick);
             if (record != null)
-            {
                 foreach (ICommand cmd in record.Commands) cmd.Execute(player);
-            }
-            else
-            {
-                // No command for this tick (gap, or before the slice starts): hold still so
-                // the echo doesn't coast on a stale movement direction.
-                player.Move(Vector2.zero);
-                player.SetJumpHeld(false);
-            }
+            // else: nothing changed this tick — carry forward the controller's current state
+            // (sparse recording; the slice re-established the sticky state at its start).
         }
 
         // Step physics every tick so the echo settles naturally under gravity.

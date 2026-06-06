@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.InputSystem;
 
@@ -25,6 +26,13 @@ public class PlayerCommandInvoker : MonoBehaviour, ITickable
     // on the next fixed tick, so a press between two ticks is counted exactly once.
     private bool jumpPressedThisTick;
     private bool usePressedThisTick;
+
+    // Change-detection for sparse recording: emit a Move/JumpHeld command only when it differs
+    // from the last tick (continuous state is carried forward). hasRecorded forces the first
+    // tick to emit both, establishing the initial sticky state.
+    private Vector2 lastMove;
+    private bool lastJumpHeld;
+    private bool hasRecorded;
 
     private Action<InputAction.CallbackContext> onJumpStarted;
     private Action<InputAction.CallbackContext> onUseStarted;
@@ -63,23 +71,27 @@ public class PlayerCommandInvoker : MonoBehaviour, ITickable
 
     public void Tick(int tick, float dt)
     {
-        var record = new TickRecord { Tick = tick };
+        Vector2 move = moveAction != null ? moveAction.ReadValue<Vector2>() : Vector2.zero;
+        bool jumpHeld = jumpAction != null && jumpAction.IsPressed();
 
-        // Continuous state, recorded every tick:
-        record.Commands.Add(new MoveCommand(moveAction != null ? moveAction.ReadValue<Vector2>() : Vector2.zero));
-        record.Commands.Add(new JumpHeldCommand(jumpAction != null && jumpAction.IsPressed()));
+        // Record (and execute) ONLY what changed this tick; continuous state carries forward.
+        List<ICommand> changed = null;
+        if (!hasRecorded || move != lastMove)
+            (changed ??= new List<ICommand>()).Add(new MoveCommand(move));
+        if (!hasRecorded || jumpHeld != lastJumpHeld)
+            (changed ??= new List<ICommand>()).Add(new JumpHeldCommand(jumpHeld));
+        if (jumpPressedThisTick) (changed ??= new List<ICommand>()).Add(new JumpCommand());
+        if (usePressedThisTick) (changed ??= new List<ICommand>()).Add(new UseCommand());
 
-        // Discrete presses, recorded only on the tick they happened:
-        if (jumpPressedThisTick) record.Commands.Add(new JumpCommand());
-        if (usePressedThisTick) record.Commands.Add(new UseCommand());
+        lastMove = move;
+        lastJumpHeld = jumpHeld;
+        hasRecorded = true;
 
-        // 1) drive the live player, 2) advance physics, 3) save for replay.
-        foreach (ICommand cmd in record.Commands)
-            cmd.Execute(player);
-
+        // 1) drive the live player with the changes, 2) advance physics, 3) record.
+        if (changed != null)
+            foreach (ICommand cmd in changed) cmd.Execute(player);
         controller.Tick(tick, dt);
-
-        Timeline.Append(record);
+        Timeline.Record(tick, changed);
 
         jumpPressedThisTick = false;
         usePressedThisTick = false;

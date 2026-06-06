@@ -4,7 +4,7 @@
 /// clone must receive the same held state each tick or its jump arc would differ from
 /// past-you's.
 /// </summary>
-public class JumpHeldCommand : ICommand
+public class JumpHeldCommand : IStickyCommand
 {
     private readonly bool held;
 

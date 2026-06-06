@@ -11,3 +11,12 @@ public interface ICommand
 {
     void Execute(Player target);
 }
+
+/// <summary>
+/// Marks a command whose effect PERSISTS until changed — movement direction, jump-held.
+/// These are recorded only when they change and carried forward in between (sparse logging),
+/// and on rewind a slice re-establishes the latest sticky command of each kind at its start
+/// so a replaying clone resumes mid-stride. Discrete one-shot commands (jump press, use) are
+/// NOT sticky.
+/// </summary>
+public interface IStickyCommand : ICommand { }
