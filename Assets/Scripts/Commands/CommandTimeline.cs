@@ -1,30 +1,40 @@
+using System;
 using System.Collections.Generic;
 
 /// <summary>
-/// An ordered, dense recording of one play-through: one <see cref="TickRecord"/> per
-/// tick, appended in ascending tick order. Addressed by ABSOLUTE tick (via
-/// <see cref="TickRecord.Tick"/>, binary search) rather than by list position, so the
-/// command side stays correct even if recording starts at a tick &gt; 0 or the head is
-/// ever trimmed — it never assumes index == tick.
+/// A recording of one play-through, stored SPARSELY: a TickRecord is appended only on ticks
+/// where input CHANGED (a new movement direction / jump-held edge, or a discrete jump/use
+/// press). Continuous state is carried forward in between, so most ticks store nothing — this
+/// is what keeps per-tick allocations near zero while still using the Command pattern.
 ///
-/// On rewind the caretaker resolves a target tick T; the live timeline is split there:
-/// <see cref="SliceFromTick"/> hands a frozen [T, now] copy to a freshly spawned clone,
-/// and <see cref="TruncateAfterTick"/> drops the live player's post-T frames so it
-/// re-records forward. Note the asymmetry vs the caretaker's state DiscardAfter: state
-/// after T is discarded, but the commands after T are RETAINED in the clone's slice.
+/// The recording's extent (the present) is tracked separately by recordingEndTick, advanced
+/// every tick, so a clone knows when it has caught up regardless of when the last change was.
+/// Frames are addressed by absolute TickRecord.Tick (binary search), never by list position.
+///
+/// On rewind the live timeline is split at target tick T: SliceFromTick hands a clone a frozen
+/// [T, end] copy — WITH the carried-forward sticky state (movement / jump-held begun before T)
+/// re-established at T so the clone resumes mid-stride — while TruncateAfterTick drops the live
+/// player's post-T records.
 /// </summary>
 public class CommandTimeline
 {
-    private readonly List<TickRecord> frames = new List<TickRecord>();
+    private readonly List<TickRecord> frames = new List<TickRecord>(); // change ticks only
+    private int recordingEndTick = int.MinValue;                       // last recorded tick = the present
 
-    public int Count => frames.Count;
     public int FirstTick => frames.Count == 0 ? int.MaxValue : frames[0].Tick;
-    public int LastTick => frames.Count == 0 ? int.MinValue : frames[frames.Count - 1].Tick;
+    public int LastTick => recordingEndTick; // recording extent (for retire), not the last change
 
-    public void Append(TickRecord frame) => frames.Add(frame);
-    public void Clear() => frames.Clear();
+    /// <summary>Advance the recording to `tick`, appending a record only if something changed.</summary>
+    public void Record(int tick, List<ICommand> changed)
+    {
+        recordingEndTick = tick;
+        if (changed != null && changed.Count > 0)
+            frames.Add(new TickRecord { Tick = tick, Commands = changed });
+    }
 
-    // Exact index of the frame whose Tick == tick, or -1. Frames are sorted by Tick.
+    public void Clear() { frames.Clear(); recordingEndTick = int.MinValue; }
+
+    // exact index of the frame whose Tick == tick, or -1 (frames are sorted ascending by Tick)
     private int IndexOfTick(int tick)
     {
         int lo = 0, hi = frames.Count - 1;
@@ -38,7 +48,7 @@ public class CommandTimeline
         return -1;
     }
 
-    // Index of the last frame whose Tick <= tick, or -1 if none.
+    // index of the last frame whose Tick <= tick, or -1
     private int FloorIndexOfTick(int tick)
     {
         int lo = 0, hi = frames.Count - 1, res = -1;
@@ -51,28 +61,58 @@ public class CommandTimeline
         return res;
     }
 
-    /// <summary>The record recorded for absolute <paramref name="tick"/>, or null if none.</summary>
+    /// <summary>The change-record at absolute `tick`, or null if nothing changed that tick.</summary>
     public TickRecord GetAtTick(int tick)
     {
         int i = IndexOfTick(tick);
         return i < 0 ? null : frames[i];
     }
 
-    /// <summary>A frozen copy of every frame with Tick &gt;= fromTick — handed to a clone on
-    /// rewind. Shares the (immutable-once-recorded) TickRecord instances; only the list is copied.</summary>
+    /// <summary>Frozen [fromTick, end] copy for a clone, with the carried-forward sticky state
+    /// re-established at fromTick so the clone resumes mid-stride.</summary>
     public CommandTimeline SliceFromTick(int fromTick)
     {
         var copy = new CommandTimeline();
+        copy.recordingEndTick = recordingEndTick;
+
+        // Latest sticky command of each type carried INTO fromTick (from records before it).
+        var openers = new Dictionary<Type, ICommand>();
+        int firstIdx = frames.Count;
         for (int i = 0; i < frames.Count; i++)
-            if (frames[i].Tick >= fromTick) copy.frames.Add(frames[i]);
+        {
+            if (frames[i].Tick >= fromTick) { firstIdx = i; break; }
+            foreach (var c in frames[i].Commands)
+                if (c is IStickyCommand) openers[c.GetType()] = c;
+        }
+
+        for (int i = firstIdx; i < frames.Count; i++) copy.frames.Add(frames[i]);
+
+        if (openers.Count > 0)
+        {
+            if (copy.frames.Count > 0 && copy.frames[0].Tick == fromTick)
+            {
+                // A change already lands on fromTick — prepend only the sticky kinds it lacks.
+                var present = new HashSet<Type>();
+                foreach (var c in copy.frames[0].Commands) present.Add(c.GetType());
+                var merged = new List<ICommand>();
+                foreach (var kv in openers) if (!present.Contains(kv.Key)) merged.Add(kv.Value);
+                merged.AddRange(copy.frames[0].Commands);
+                copy.frames[0] = new TickRecord { Tick = fromTick, Commands = merged };
+            }
+            else
+            {
+                copy.frames.Insert(0, new TickRecord { Tick = fromTick, Commands = new List<ICommand>(openers.Values) });
+            }
+        }
         return copy;
     }
 
-    /// <summary>Keep frames with Tick &lt;= tick, drop the rest, so the live player re-records
-    /// from tick+1.</summary>
+    /// <summary>Keep change-records with Tick &lt;= tick; set the recording end to tick so the
+    /// live player re-records forward from tick+1.</summary>
     public void TruncateAfterTick(int tick)
     {
-        int keep = FloorIndexOfTick(tick) + 1; // -1 -> keep 0
+        int keep = FloorIndexOfTick(tick) + 1; // -1 -> 0
         if (keep < frames.Count) frames.RemoveRange(keep, frames.Count - keep);
+        recordingEndTick = tick;
     }
 }
