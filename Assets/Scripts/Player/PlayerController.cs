@@ -45,10 +45,18 @@ public class PlayerController : MonoBehaviour
     // the same commands reproduces the same jumps. The two seconds-durations are
     // converted to tick counts once in Awake (fixed timestep is constant).
     private const float PostJumpGroundedSuppressSeconds = 0.1f;
-    private int jumpBufferTicks;
-    private int groundSuppressTicks;
-    private int jumpBufferCounter;     // >0 => a jump is buffered; counts down each tick
-    private int groundSuppressCounter; // >0 => ground detection suppressed just after a jump
+    private int jumpBufferTicks;     // jump-buffer window length, in ticks
+    private int groundSuppressTicks; // post-jump ground-suppress window length, in ticks
+
+    // Jump buffer / ground-suppress are stored as absolute tick STAMPS (not counting-down
+    // counters) and compared against the current tick. That makes them rewind-safe with no
+    // extra channel: after a rewind the current tick moves back while a stamp stays, so the
+    // stamp sits in the future and the "happened recently in the past" window fails — no
+    // phantom jump. A detected backward tick also clears them outright.
+    private int lastJumpPressTick = int.MinValue;
+    private int lastJumpedTick = int.MinValue;
+    private bool jumpRequested;
+    private int currentTick;
 
     public event Action OnJumped;
     public event Action OnLanded;
@@ -74,15 +82,14 @@ public class PlayerController : MonoBehaviour
 
     public void SetDirection(Vector2 newDirection) => direction = newDirection;
 
-    public void RequestJump() => jumpBufferCounter = jumpBufferTicks;
+    public void RequestJump() => jumpRequested = true;
 
     public void SetJumpHeld(bool held)
     {
         jumpHeld = held;
-        // Releasing the jump button cancels any pending buffered jump request, so a
-        // tap doesn't fire a late jump if the player happens to touch ground during
-        // the buffer window.
-        if (!held) jumpBufferCounter = 0;
+        // Releasing the jump button cancels any pending buffered jump, so a tap doesn't fire
+        // a late jump if the player happens to touch ground during the buffer window.
+        if (!held) { jumpRequested = false; lastJumpPressTick = int.MinValue; }
     }
 
     /// <summary>
@@ -92,18 +99,19 @@ public class PlayerController : MonoBehaviour
     /// </summary>
     public void Tick(int tick, float dt)
     {
-        if (groundSuppressCounter > 0) groundSuppressCounter--;
+        // A backward tick means the clock was rewound — drop stale jump/suppress stamps so the
+        // restored body doesn't fire a phantom buffered jump or suppress grounding.
+        if (tick < currentTick) { lastJumpPressTick = int.MinValue; lastJumpedTick = int.MinValue; }
+        currentTick = tick;
+
+        // Stamp a freshly latched jump press with this tick.
+        if (jumpRequested) { lastJumpPressTick = tick; jumpRequested = false; }
 
         IsOnGround = CheckGrounded();
         ApplyHorizontalMovement(dt);
         ApplyVariableGravity();
         TryJump();
         FireLandEvent();
-
-        // Expire the jump buffer AFTER this tick's TryJump, so a press latched the same tick
-        // (RequestJump runs in the invoker before controller.Tick) still gets its full window
-        // — even at jumpBufferTicks == 1.
-        if (jumpBufferCounter > 0) jumpBufferCounter--;
     }
 
     private static readonly RaycastHit2D[] _groundHits = new RaycastHit2D[8];
@@ -115,7 +123,8 @@ public class PlayerController : MonoBehaviour
         // Briefly suppress grounded-detection right after a jump, so the next tick
         // doesn't re-pin the player to the surface and clobber the jump's vertical
         // velocity in ApplyHorizontalMovement.
-        if (groundSuppressCounter > 0) return false;
+        if (lastJumpedTick != int.MinValue && currentTick >= lastJumpedTick
+            && currentTick - lastJumpedTick < groundSuppressTicks) return false;
 
         var filter = _groundFilter;
         filter.useLayerMask = true;
@@ -199,11 +208,13 @@ public class PlayerController : MonoBehaviour
 
     private void TryJump()
     {
-        if (jumpBufferCounter > 0 && IsOnGround)
+        bool buffered = lastJumpPressTick != int.MinValue && currentTick >= lastJumpPressTick
+                        && currentTick - lastJumpPressTick <= jumpBufferTicks;
+        if (buffered && IsOnGround)
         {
             rb.linearVelocity = new Vector2(rb.linearVelocity.x, jumpForce);
-            jumpBufferCounter = 0;
-            groundSuppressCounter = groundSuppressTicks;
+            lastJumpPressTick = int.MinValue;  // consume the buffered press
+            lastJumpedTick = currentTick;      // start the post-jump ground-suppress window
             // Immediately mark airborne so this tick's FireLandEvent and the next
             // tick's CheckGrounded behave consistently.
             IsOnGround = false;

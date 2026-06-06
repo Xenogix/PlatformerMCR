@@ -38,6 +38,14 @@ public sealed class SparseHistory<T> : IHistory<T> where T : struct, IEquatable<
 
     public T ValueAt(int tick) => _values[FloorIndex(tick)];
 
+    public bool TryValueAt(int tick, out T value)
+    {
+        int idx = FloorIndex(tick);
+        if (idx < 0) { value = default; return false; }
+        value = _values[idx];
+        return true;
+    }
+
     // Returns `fallback` when no entry exists at or before `tick`.
     public T ValueAtOr(int tick, T fallback)
     {

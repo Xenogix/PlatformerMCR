@@ -28,6 +28,13 @@ public sealed class DenseHistory<T> : IHistory<T> where T : struct
         return _values[idx];
     }
 
+    public bool TryValueAt(int tick, out T value)
+    {
+        if (_values.Count == 0) { value = default; return false; }
+        value = ValueAt(tick);
+        return true;
+    }
+
     // Rewind: drop every entry recorded strictly after `tick`.
     public void DiscardAfter(int tick)
     {
