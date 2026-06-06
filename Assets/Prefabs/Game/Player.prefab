@@ -13,9 +13,9 @@ GameObject:
   - component: {fileID: 8831654949185616336}
   - component: {fileID: 2585045916330304231}
   - component: {fileID: 4680303604209653667}
-  - component: {fileID: 8433654832190438974}
   - component: {fileID: 7785516961323507122}
   - component: {fileID: 2014986075053325113}
+  - component: {fileID: 8136204493583721912}
   m_Layer: 0
   m_Name: Player
   m_TagString: Untagged
@@ -125,19 +125,12 @@ MonoBehaviour:
   jumpForce: 25
   jumpBufferTime: 0.1
   fallGravityMultiplier: 7
-  lowJumpGravityMultiplier: 10
---- !u!114 &8433654832190438974
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 2227488959991407352}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 0075c847917e0c142b5b221cfd6c76f8, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::PlayerControllerInput
+  groundLayer:
+    serializedVersion: 2
+    m_Bits: 4294967295
+  groundCheckSize: {x: 1, y: 0.1}
+  groundCheckDistance: 0.05
+  maxSlopeAngle: 60
 --- !u!50 &7785516961323507122
 Rigidbody2D:
   serializedVersion: 5
@@ -211,3 +204,15 @@ BoxCollider2D:
   m_AutoTiling: 0
   m_Size: {x: 1, y: 1}
   m_EdgeRadius: 0
+--- !u!114 &8136204493583721912
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2227488959991407352}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 1f2a44223e551d047b3773be31865a77, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::PlayerCommandInvoker
