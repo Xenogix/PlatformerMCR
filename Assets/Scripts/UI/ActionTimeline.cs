@@ -1,17 +1,15 @@
-using System;
 using System.Collections.Generic;
 using UnityEngine;
-using UnityEngine.EventSystems;
 using UnityEngine.UI;
 
-// Bottom-of-screen timeline of recorded actions, one lane per character (P1 + clones), with a shared
-// playhead marking the current time — think Super Time Force. The Director drives it: add a lane per
-// clone, grow its progress, drop ticks, move the playhead.
+// Bottom-of-screen timeline of recorded actions, one lane per character (P1 + clones), with a
+// shared playhead marking the scrub position — think Super Time Force. The RewindDirector drives
+// it: add a lane per clone, colour each lane's life window, and move the playhead. A translucent
+// "future" overlay dims everything to the right of the playhead (the states you'd leave behind).
 //
-// Sizing is fully layout-driven: lanesContainer uses a VerticalLayoutGroup + ContentSizeFitter so
-// the stack grows with the clones, and the playhead is a child of it, vertically stretched
-// (LayoutElement: Ignore Layout), so it always matches the stack. This class only drives the
-// playhead's horizontal position plus the selection/visibility plumbing.
+// Sizing is layout-driven: lanesContainer uses a VerticalLayoutGroup + ContentSizeFitter so the
+// stack grows with the clones; the playhead and the future overlay are vertically-stretched
+// children of it (LayoutElement: Ignore Layout), so they always match the stack height.
 public class ActionTimeline : MonoBehaviour
 {
     [Tooltip("Container holding the lane rows (VerticalLayoutGroup + ContentSizeFitter).")]
@@ -24,37 +22,55 @@ public class ActionTimeline : MonoBehaviour
     [Tooltip("Left inset (px) so the playhead lines up with the lane bars, which start after the " +
              "label column. Match it to the lane Track's left offset.")]
     [SerializeField] private float playheadLeftInset = 40f;
-    [Tooltip("Optional \"New Timeline\"/Add button to start a new recording. Place it yourself; it's " +
-             "wired for navigation + Submit only.")]
-    [SerializeField] private Button newTimelineButton;
     [Tooltip("Optional CanvasGroup used to show/hide the timeline. Auto-added if left empty.")]
     [SerializeField] private CanvasGroup canvasGroup;
+    [Tooltip("Colour of the translucent overlay that dims the 'future' (everything to the right of " +
+             "the playhead — the states you'd discard/replay if you confirmed here).")]
+    [SerializeField] private Color futureMaskColor = new(0f, 0f, 0f, 0.55f);
 
     private readonly List<LaneView> _lanes = new();
-
-    public int LaneCount => _lanes.Count;
-
-    // Raised on Submit (keyboard/gamepad) so the Director can act: a lane index to load/replay that
-    // clone, or NewTimelineSubmitted to start a fresh recording. The timeline stays agnostic.
-    public event Action<int> LaneSubmitted;
-    public event Action NewTimelineSubmitted;
-
-    private void Awake()
-    {
-        if (newTimelineButton != null)
-        {
-            SetAutoNavigation(newTimelineButton);
-            newTimelineButton.onClick.AddListener(() => NewTimelineSubmitted?.Invoke());
-        }
-    }
+    private RectTransform _futureMask; // dims [playhead .. right edge]; built at runtime
 
     private void Start()
     {
         Canvas.ForceUpdateCanvases(); // valid parent width before the first seat
+        BuildFutureMask();
         SetPlayhead(0f);
     }
 
-    // Adds a lane (e.g. on clone creation) and returns its index for later updates.
+    // The "future" dim: a translucent overlay spanning [playhead, right edge] across all lanes,
+    // showing the recorded states ahead of the playhead as greyed-out. Built in code so no prefab
+    // wiring is needed.
+    private void BuildFutureMask()
+    {
+        if (_futureMask != null || playhead == null || playhead.parent is not RectTransform parent) return;
+
+        var go = new GameObject("FutureMask", typeof(RectTransform), typeof(CanvasRenderer), typeof(Image));
+        _futureMask = go.GetComponent<RectTransform>();
+        _futureMask.SetParent(parent, false);
+        _futureMask.anchorMin = new Vector2(1f, 0f); // starts empty (playhead at present)
+        _futureMask.anchorMax = new Vector2(1f, 1f);
+        _futureMask.offsetMin = Vector2.zero;
+        _futureMask.offsetMax = Vector2.zero;
+
+        var img = go.GetComponent<Image>();
+        img.color = futureMaskColor;
+        img.raycastTarget = false;
+
+        go.AddComponent<LayoutElement>().ignoreLayout = true; // not part of the VerticalLayoutGroup stack
+
+        BringOverlaysToFront();
+    }
+
+    // Keep the future mask, then the playhead, as the last siblings so they draw above the lanes
+    // (sibling order = draw order). Called after lanes are added.
+    private void BringOverlaysToFront()
+    {
+        if (_futureMask != null) _futureMask.SetAsLastSibling();
+        if (playhead != null) playhead.SetAsLastSibling();
+    }
+
+    // Adds a lane (on clone creation) and returns its index for later updates.
     public int AddLane(string label, Color color)
     {
         if (laneTemplate == null || lanesContainer == null) return -1;
@@ -63,32 +79,22 @@ public class ActionTimeline : MonoBehaviour
         lane.gameObject.SetActive(true);
         lane.SetLabel(label);
         lane.SetColor(color);
-        lane.SetProgress(0f);
-
-        if (lane.Button != null)
-        {
-            int index = _lanes.Count;
-            SetAutoNavigation(lane.Button);
-            lane.Button.onClick.AddListener(() => LaneSubmitted?.Invoke(index));
-        }
+        lane.SetSegment(0f, 0f); // empty until the Director colours its life window
 
         _lanes.Add(lane);
+        BringOverlaysToFront(); // keep mask + playhead above the freshly added lane
         return _lanes.Count - 1;
     }
 
-    public void SetLaneProgress(int lane, float t01)
+    // Colours lane's [start01, end01] window (its life span); the rest stays the grey track bg.
+    public void SetLaneSegment(int lane, float start01, float end01)
     {
-        if (lane >= 0 && lane < _lanes.Count) _lanes[lane].SetProgress(t01);
+        if (lane >= 0 && lane < _lanes.Count) _lanes[lane].SetSegment(start01, end01);
     }
 
-    public void AddEvent(int lane, float t01)
-    {
-        if (lane >= 0 && lane < _lanes.Count) _lanes[lane].AddTick(t01);
-    }
-
-    // Moves the shared playhead. t01 is normalized over the recording window (0 = start, 1 = end).
-    // Drives only the horizontal anchor (mapped into [leftInset, fullWidth] so it lines up with the
-    // lane bars); the height is layout-driven (vertically-stretched child of lanesContainer).
+    // Moves the shared playhead and the future overlay. t01 is normalized over the timeline window
+    // (0 = start, 1 = right edge). Drives only the horizontal anchor (mapped into [leftInset, width]
+    // so it lines up with the lane bars); the height is layout-driven.
     public void SetPlayhead(float t01)
     {
         if (playhead == null) return;
@@ -102,18 +108,17 @@ public class ActionTimeline : MonoBehaviour
         playhead.anchorMin = new Vector2(x, playhead.anchorMin.y);
         playhead.anchorMax = new Vector2(x, playhead.anchorMax.y);
         playhead.anchoredPosition = new Vector2(0f, playhead.anchoredPosition.y);
+
+        if (_futureMask != null) // dim from the playhead to the right edge
+        {
+            _futureMask.anchorMin = new Vector2(x, 0f);
+            _futureMask.anchorMax = new Vector2(1f, 1f);
+            _futureMask.offsetMin = Vector2.zero;
+            _futureMask.offsetMax = Vector2.zero;
+        }
     }
 
-    // Resets the timeline (e.g. on level restart).
-    public void ClearLanes()
-    {
-        foreach (var lane in _lanes)
-            if (lane != null) Destroy(lane.gameObject);
-        _lanes.Clear();
-    }
-
-    // Show/hide the whole timeline via a CanvasGroup (keeps the GameObject active). Hiding also makes
-    // it non-interactable and drops the EventSystem focus.
+    // Show/hide the whole timeline via a CanvasGroup (keeps the GameObject active).
     public void SetVisible(bool visible)
     {
         if (canvasGroup == null) canvasGroup = GetComponent<CanvasGroup>();
@@ -122,27 +127,5 @@ public class ActionTimeline : MonoBehaviour
         canvasGroup.alpha = visible ? 1f : 0f;
         canvasGroup.interactable = visible;
         canvasGroup.blocksRaycasts = visible;
-
-        if (!visible && EventSystem.current != null)
-            EventSystem.current.SetSelectedGameObject(null);
-    }
-
-    // Focuses the first lane (or the New button if there are no lanes) when the pause menu opens, so
-    // keyboard/gamepad navigation has a starting point.
-    public void FocusSelection()
-    {
-        var es = EventSystem.current;
-        if (es == null) return;
-        GameObject target =
-            _lanes.Count > 0 && _lanes[0].Button != null ? _lanes[0].Button.gameObject :
-            newTimelineButton != null ? newTimelineButton.gameObject : null;
-        if (target != null) es.SetSelectedGameObject(target);
-    }
-
-    private static void SetAutoNavigation(Selectable selectable)
-    {
-        var nav = selectable.navigation;
-        nav.mode = Navigation.Mode.Automatic; // neighbours computed by position → handles the dynamic list
-        selectable.navigation = nav;
     }
 }

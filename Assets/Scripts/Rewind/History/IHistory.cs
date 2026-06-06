@@ -8,4 +8,6 @@ public interface IHistory<T> where T : struct
     bool TryValueAt(int tick, out T value);
     void DiscardAfter(int tick);
     void TrimBefore(int windowStartTick);
+    // Drop everything, resetting to the empty state — so the next Record starts a fresh run.
+    void Clear();
 }

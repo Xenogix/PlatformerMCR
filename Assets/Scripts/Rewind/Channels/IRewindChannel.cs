@@ -6,4 +6,5 @@ public interface IRewindChannel
     void Restore(int tick);
     void DiscardAfter(int tick);
     void TrimBefore(int windowStartTick);
+    void Clear();
 }

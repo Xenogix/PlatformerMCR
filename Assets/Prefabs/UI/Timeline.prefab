@@ -162,9 +162,10 @@ MonoBehaviour:
   lanesContainer: {fileID: 5280510187684820295}
   laneTemplate: {fileID: 1419152848664311809}
   playhead: {fileID: 8168004963163381923}
-  playheadLeftInset: 50
+  playheadLeftInset: 100
   newTimelineButton: {fileID: 7362064413977082698}
   canvasGroup: {fileID: 7197659543082243061}
+  futureMaskColor: {r: 0, g: 0, b: 0, a: 0.55}
 --- !u!1 &3245161350154919650
 GameObject:
   m_ObjectHideFlags: 0

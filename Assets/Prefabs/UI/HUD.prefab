@@ -85,7 +85,6 @@ GameObject:
   m_Component:
   - component: {fileID: 5335548942083068583}
   - component: {fileID: 4471907531819066042}
-  - component: {fileID: 3172876014769836903}
   m_Layer: 0
   m_Name: HUD
   m_TagString: Untagged
@@ -140,21 +139,6 @@ MonoBehaviour:
   toastLabel: {fileID: 4243125811230740217}
   toastFade: 0.15
   timeline: {fileID: 2728409813896284321}
---- !u!114 &3172876014769836903
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 2872982633743274677}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 5c01890b74276194aa880871f2a65247, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::HudMockDirector
-  hud: {fileID: 4471907531819066042}
-  scrubSpeed: 0.35
-  showLegend: 1
 --- !u!1 &3589712157801386183
 GameObject:
   m_ObjectHideFlags: 0

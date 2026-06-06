@@ -45,8 +45,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 497a9acabebebe4f48508bf49e322098, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::RewindCaretaker
-  captureRate: 5
-  rewindOffsetSeconds: 3
+  captureRate: 1
   windowSeconds: 0
 --- !u!114 &1455366977950439227
 MonoBehaviour:
@@ -60,6 +59,10 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 01168c4bd99f41794ac87b4d6c2ae31f, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::RewindDirector
-  rewindKey: 32
   echoMassFactor: 0.2
   echoPrefab: {fileID: 6565340575648495675, guid: fe9e9bed8eaf74f40b4434be07ac495f, type: 3}
+  scrubTicksPerSecond: 50
+  scrubMaxTicksPerSecond: 300
+  scrubAccelSeconds: 1.2
+  cloneColor: {r: 1, g: 0.78, b: 0.45, a: 1}
+  playerColor: {r: 0.55, g: 0.9, b: 1, a: 1}
