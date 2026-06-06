@@ -3,7 +3,6 @@
 public interface IHistory<T> where T : struct
 {
     void Record(int tick, T value);
-    T ValueAt(int tick);
     // Safe read: false (and value=default) when there is no value at or before `tick`,
     // so a channel restored before its first capture writes nothing instead of throwing.
     bool TryValueAt(int tick, out T value);

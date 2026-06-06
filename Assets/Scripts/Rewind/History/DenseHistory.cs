@@ -18,20 +18,13 @@ public sealed class DenseHistory<T> : IHistory<T> where T : struct
         _values.Add(value); // contract: tick == _baseTick + _values.Count*_step
     }
 
-    public T ValueAt(int tick)
-    {
-        if (_values.Count == 0)
-            throw new InvalidOperationException("DenseHistory.ValueAt on empty history");
-        int idx = _step <= 0 ? 0 : (tick - _baseTick) / _step;
-        if (idx < 0) idx = 0;                               // before earliest -> clamp
-        else if (idx >= _values.Count) idx = _values.Count - 1; // after latest -> last
-        return _values[idx];
-    }
-
     public bool TryValueAt(int tick, out T value)
     {
         if (_values.Count == 0) { value = default; return false; }
-        value = ValueAt(tick);
+        int idx = _step <= 0 ? 0 : (tick - _baseTick) / _step;
+        if (idx < 0) idx = 0;                               // before earliest -> clamp
+        else if (idx >= _values.Count) idx = _values.Count - 1; // after latest -> last
+        value = _values[idx];
         return true;
     }
 

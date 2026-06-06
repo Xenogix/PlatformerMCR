@@ -2,26 +2,18 @@ using System.Collections.Generic;
 using UnityEngine;
 
 /// <summary>
-/// Single source of "game time", advancing in fixed steps so that gameplay is
-/// deterministic-ish: re-running the same commands on the same ticks reproduces (close
-/// to) the same physics. This is what lets a rewound clone retrace what past-you did.
-///
-/// Two phases per <see cref="FixedUpdate"/>, both with the same integer tick index:
-///   1. <see cref="ITickable"/>s registered via <see cref="Register"/> — the MOVERS
-///      (player invoker, clone playbacks) that set velocities for this tick.
-///   2. post-tickables registered via <see cref="RegisterPost"/> — OBSERVERS (the rewind
-///      caretaker) that run AFTER the movers, so they capture this tick's post-move state.
-///
-/// The instance is created lazily, so you don't strictly need to place a GameClock
-/// object in the scene — but you can, if you want to control where it lives.
+/// Single source of "game time", advancing in fixed steps. Each FixedUpdate it ticks two
+/// groups with the same integer tick index, then increments it:
+///   1. MOVERS (player invoker, clone playbacks) — set velocities for this tick.
+///   2. OBSERVERS (the rewind caretaker) — run AFTER the movers, so they capture this tick's
+///      post-move state.
+/// Created lazily, so a GameClock object need not be placed in the scene.
 /// </summary>
 public class GameClock : MonoBehaviour
 {
     private static GameClock instance;
 
-    /// <summary>True if an instance exists WITHOUT creating one — safe to use in
-    /// OnDisable/OnDestroy/teardown, where the auto-creating Instance getter would otherwise
-    /// resurrect a clock.</summary>
+    /// <summary>True if an instance exists WITHOUT creating one — safe in teardown/OnDisable.</summary>
     public static bool HasInstance => instance != null;
 
     public static GameClock Instance
@@ -32,10 +24,7 @@ public class GameClock : MonoBehaviour
             {
                 instance = FindAnyObjectByType<GameClock>();
                 if (instance == null)
-                {
-                    var go = new GameObject(nameof(GameClock));
-                    instance = go.AddComponent<GameClock>();
-                }
+                    instance = new GameObject(nameof(GameClock)).AddComponent<GameClock>();
             }
             return instance;
         }
@@ -44,24 +33,16 @@ public class GameClock : MonoBehaviour
     /// <summary>The current fixed-step tick index. Starts at 0, increments after each step.</summary>
     public int Tick { get; private set; }
 
-    private readonly List<ITickable> tickables = new List<ITickable>();
-    private readonly List<ITickable> postTickables = new List<ITickable>();
+    /// <summary>Convert a duration in seconds to a count of fixed ticks (min 1) — the single
+    /// home for the seconds→ticks rule used by jump buffers, rewind offsets, and windows.</summary>
+    public static int SecondsToTicks(float seconds) => Mathf.Max(1, Mathf.RoundToInt(seconds / Time.fixedDeltaTime));
 
-    // Buffered so a tickable can (un)register during a tick without mutating a list
-    // we're iterating (e.g. a clone that registers the moment it spawns, or a copied
-    // invoker that is stripped off an echo the same frame it was instantiated).
-    private readonly List<ITickable> pendingAdd = new List<ITickable>();
-    private readonly List<ITickable> pendingRemove = new List<ITickable>();
-    private readonly List<ITickable> pendingPostAdd = new List<ITickable>();
-    private readonly List<ITickable> pendingPostRemove = new List<ITickable>();
+    private readonly TickGroup _movers = new TickGroup();
+    private readonly TickGroup _observers = new TickGroup();
 
     private void Awake()
     {
-        if (instance != null && instance != this)
-        {
-            Destroy(gameObject);
-            return;
-        }
+        if (instance != null && instance != this) { Destroy(gameObject); return; }
         instance = this;
     }
 
@@ -70,58 +51,63 @@ public class GameClock : MonoBehaviour
         if (instance == this) instance = null;
     }
 
-    public void Register(ITickable tickable) => Enqueue(tickable, pendingAdd, pendingRemove, tickables);
-    public void Unregister(ITickable tickable) => Dequeue(tickable, pendingAdd, pendingRemove);
-    public void RegisterPost(ITickable tickable) => Enqueue(tickable, pendingPostAdd, pendingPostRemove, postTickables);
-    public void UnregisterPost(ITickable tickable) => Dequeue(tickable, pendingPostAdd, pendingPostRemove);
-
-    // Register/unregister cancel each other within a single tick window: if a tickable
-    // is added then removed before the next flush (spawn + strip in one frame), it ends
-    // up NOT registered, instead of being left in the list as a destroyed component.
-    private static void Enqueue(ITickable t, List<ITickable> add, List<ITickable> remove, List<ITickable> live)
-    {
-        remove.Remove(t);
-        if (!live.Contains(t) && !add.Contains(t)) add.Add(t);
-    }
-
-    private static void Dequeue(ITickable t, List<ITickable> add, List<ITickable> remove)
-    {
-        if (add.Remove(t)) return; // never really added — cancel it
-        if (!remove.Contains(t)) remove.Add(t);
-    }
+    public void Register(ITickable tickable) => _movers.Register(tickable);
+    public void Unregister(ITickable tickable) => _movers.Unregister(tickable);
+    public void RegisterPost(ITickable tickable) => _observers.Register(tickable);
+    public void UnregisterPost(ITickable tickable) => _observers.Unregister(tickable);
 
     /// <summary>
-    /// Wind the clock back to an earlier tick. The rewind feature calls this so that
-    /// clock-relative consumers (clone playback) reset their replay position for free;
-    /// the per-tick world state is restored separately by the rewind caretaker.
+    /// Wind the clock back to an earlier tick. The rewind feature calls this so clock-relative
+    /// consumers (clone playback) reset their replay position for free; per-tick world state is
+    /// restored separately by the rewind caretaker.
     /// </summary>
     public void RewindTo(int tick) => Tick = Mathf.Max(0, tick);
 
     private void FixedUpdate()
     {
-        int current = Tick;
         float dt = Time.fixedDeltaTime;
-
-        Flush(tickables, pendingAdd, pendingRemove);
-        for (int i = 0; i < tickables.Count; i++) tickables[i].Tick(current, dt);
-
-        Flush(postTickables, pendingPostAdd, pendingPostRemove);
-        for (int i = 0; i < postTickables.Count; i++) postTickables[i].Tick(current, dt);
-
+        _movers.Tick(Tick, dt);
+        _observers.Tick(Tick, dt);
         Tick++;
     }
 
-    private static void Flush(List<ITickable> live, List<ITickable> add, List<ITickable> remove)
+    /// <summary>
+    /// A set of ITickables ticked together, with buffered (un)registration so a tickable can
+    /// (un)register during a tick without disturbing iteration. An add and a remove requested in
+    /// the same window cancel out, so a spawn-then-strip (e.g. an echo's copied invoker) never
+    /// leaves a destroyed tickable in the live list.
+    /// </summary>
+    private sealed class TickGroup
     {
-        if (remove.Count > 0)
+        private readonly List<ITickable> _live = new List<ITickable>();
+        private readonly List<ITickable> _pendingAdd = new List<ITickable>();
+        private readonly List<ITickable> _pendingRemove = new List<ITickable>();
+
+        public void Register(ITickable t)
         {
-            foreach (var t in remove) live.Remove(t);
-            remove.Clear();
+            _pendingRemove.Remove(t);
+            if (!_live.Contains(t) && !_pendingAdd.Contains(t)) _pendingAdd.Add(t);
         }
-        if (add.Count > 0)
+
+        public void Unregister(ITickable t)
         {
-            live.AddRange(add);
-            add.Clear();
+            if (_pendingAdd.Remove(t)) return;          // never really added — cancel
+            if (!_pendingRemove.Contains(t)) _pendingRemove.Add(t);
+        }
+
+        public void Tick(int tick, float dt)
+        {
+            if (_pendingRemove.Count > 0)
+            {
+                foreach (var t in _pendingRemove) _live.Remove(t);
+                _pendingRemove.Clear();
+            }
+            if (_pendingAdd.Count > 0)
+            {
+                _live.AddRange(_pendingAdd);
+                _pendingAdd.Clear();
+            }
+            for (int i = 0; i < _live.Count; i++) _live[i].Tick(tick, dt);
         }
     }
 }

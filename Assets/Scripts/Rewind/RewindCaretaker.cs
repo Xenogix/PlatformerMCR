@@ -24,6 +24,8 @@ public sealed class RewindCaretaker : MonoBehaviour, ITickable
     private int _firstCapturedTick = -1;
     private bool _hasCaptured;
     private int _lastCapturedTick = int.MinValue; // dedup: never capture the same tick twice (e.g. right after a rewind)
+    private int _offsetTicks;  // rewindOffsetSeconds in ticks (cached; fixed timestep is constant)
+    private int _windowTicks;  // windowSeconds in ticks (cached)
 
     public int CurrentTick => GameClock.HasInstance ? GameClock.Instance.Tick : 0;
 
@@ -31,6 +33,8 @@ public sealed class RewindCaretaker : MonoBehaviour, ITickable
     {
         if (Instance != null && Instance != this) { Destroy(this); return; }
         Instance = this;
+        _offsetTicks = GameClock.SecondsToTicks(rewindOffsetSeconds);
+        _windowTicks = GameClock.SecondsToTicks(windowSeconds);
     }
 
     private void OnEnable() => GameClock.Instance.RegisterPost(this);
@@ -71,8 +75,7 @@ public sealed class RewindCaretaker : MonoBehaviour, ITickable
     // entities that can no longer be a rewind target.
     private void EvictAndReclaim(int now)
     {
-        int windowTicks = Mathf.Max(1, Mathf.RoundToInt(windowSeconds / Time.fixedDeltaTime));
-        int windowStart = now - windowTicks;
+        int windowStart = now - _windowTicks;
         if (windowStart <= _firstCapturedTick) return;
         for (int i = _entities.Count - 1; i >= 0; i--)
         {
@@ -98,15 +101,14 @@ public sealed class RewindCaretaker : MonoBehaviour, ITickable
     {
         if (!_hasCaptured) return -1;
         int now = GameClock.Instance.Tick;
-        int offsetTicks = Mathf.Max(1, Mathf.RoundToInt(rewindOffsetSeconds / Time.fixedDeltaTime));
-        int target = now - offsetTicks;
+        int target = now - _offsetTicks;
         target -= ((target % captureEveryNSteps) + captureEveryNSteps) % captureEveryNSteps; // snap down to a capture tick
         if (target < _firstCapturedTick) target = _firstCapturedTick;
         RewindTo(target);
         return target;
     }
 
-    public void RewindTo(int target)
+    private void RewindTo(int target)
     {
         for (int i = 0; i < _entities.Count; i++)
         {

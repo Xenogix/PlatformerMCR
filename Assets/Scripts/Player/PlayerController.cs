@@ -75,9 +75,11 @@ public class PlayerController : MonoBehaviour
         if (rb.gravityScale <= 0f) rb.gravityScale = baseGravityScale;
         baseGravityScale = rb.gravityScale;
 
-        float dt = Time.fixedDeltaTime;
-        jumpBufferTicks = Mathf.Max(1, Mathf.RoundToInt(jumpBufferTime / dt));
-        groundSuppressTicks = Mathf.Max(1, Mathf.RoundToInt(PostJumpGroundedSuppressSeconds / dt));
+        jumpBufferTicks = GameClock.SecondsToTicks(jumpBufferTime);
+        groundSuppressTicks = GameClock.SecondsToTicks(PostJumpGroundedSuppressSeconds);
+
+        _groundFilter = new ContactFilter2D { useTriggers = false, useLayerMask = true };
+        _groundFilter.SetLayerMask(groundLayer);
     }
 
     public void SetDirection(Vector2 newDirection) => direction = newDirection;
@@ -115,7 +117,7 @@ public class PlayerController : MonoBehaviour
     }
 
     private static readonly RaycastHit2D[] _groundHits = new RaycastHit2D[8];
-    private static readonly ContactFilter2D _groundFilter = new ContactFilter2D { useTriggers = false };
+    private ContactFilter2D _groundFilter; // configured once in Awake from groundLayer
 
     private bool CheckGrounded()
     {
@@ -126,16 +128,12 @@ public class PlayerController : MonoBehaviour
         if (lastJumpedTick != int.MinValue && currentTick >= lastJumpedTick
             && currentTick - lastJumpedTick < groundSuppressTicks) return false;
 
-        var filter = _groundFilter;
-        filter.useLayerMask = true;
-        filter.SetLayerMask(groundLayer);
-
         // BoxCast straight down from just inside the collider's bottom edge.
         // The cube-wide footprint catches slopes that touch the player's side, and
         // the cast gives us a surface normal in the same call.
         Bounds b = col.bounds;
         Vector2 origin = new(b.center.x, b.min.y + 0.01f);
-        int count = Physics2D.BoxCast(origin, groundCheckSize, 0f, Vector2.down, filter, _groundHits, groundCheckDistance + 0.01f);
+        int count = Physics2D.BoxCast(origin, groundCheckSize, 0f, Vector2.down, _groundFilter, _groundHits, groundCheckDistance + 0.01f);
 
         for (int i = 0; i < count; i++)
         {
