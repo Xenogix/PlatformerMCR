@@ -22,6 +22,9 @@ public sealed class RewindDirector : MonoBehaviour
     [Tooltip("Echo mass as a fraction of the player's, so the player shoves echoes around weightlessly.")]
     [SerializeField, Range(0.01f, 1f)] private float echoMassFactor = 0.2f;
 
+    [Tooltip("Echo prefab — a Player variant carrying ClonePlayback + RigidbodyChannel + RewindableEntity and NO PlayerCommandInvoker (translucent). If unset, falls back to cloning the live player.")]
+    [SerializeField] private GameObject echoPrefab;
+
     private PlayerCommandInvoker livePlayer;
 
     private void Start() => livePlayer = FindAnyObjectByType<PlayerCommandInvoker>();
@@ -63,12 +66,13 @@ public sealed class RewindDirector : MonoBehaviour
         Vector2 seedPos = srcRb != null ? srcRb.position : (Vector2)src.transform.position;
         float seedRot = srcRb != null ? srcRb.rotation : src.transform.eulerAngles.z;
 
-        GameObject echo = Instantiate(src,
-            new Vector3(seedPos.x, seedPos.y, src.transform.position.z),
-            Quaternion.Euler(0f, 0f, seedRot));
+        var pos = new Vector3(seedPos.x, seedPos.y, src.transform.position.z);
+        var rot = Quaternion.Euler(0f, 0f, seedRot);
+        GameObject echo = echoPrefab != null ? Instantiate(echoPrefab, pos, rot) : Instantiate(src, pos, rot);
         echo.name = "Echo";
 
-        // An echo must not read live input — drop the invoker; the script drives it.
+        // An echo must not read live input. The dedicated prefab has no invoker; if we fell
+        // back to cloning the live player, strip it here.
         var invoker = echo.GetComponent<PlayerCommandInvoker>();
         if (invoker != null) Destroy(invoker);
 
