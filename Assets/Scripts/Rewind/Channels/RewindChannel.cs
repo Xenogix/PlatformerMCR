@@ -21,4 +21,5 @@ public abstract class RewindChannel<T> : MonoBehaviour, IRewindChannel where T :
     public void Restore(int tick) { if (_history.TryValueAt(tick, out var state)) Write(state); }
     public void DiscardAfter(int tick) => _history.DiscardAfter(tick);
     public void TrimBefore(int windowStartTick) => _history.TrimBefore(windowStartTick);
+    public void Clear() => _history.Clear();
 }

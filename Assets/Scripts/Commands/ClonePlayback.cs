@@ -28,9 +28,6 @@ public class ClonePlayback : MonoBehaviour, ITickable
     /// <summary>Begin replaying the given recording (its frames carry absolute ticks).</summary>
     public void Play(CommandTimeline recording) => timeline = recording;
 
-    /// <summary>True once the clock has passed the end of the recording.</summary>
-    public bool Finished => timeline == null || GameClock.Instance.Tick > timeline.LastTick;
-
     private void OnEnable() => GameClock.Instance.Register(this);
 
     private void OnDisable()
@@ -40,10 +37,10 @@ public class ClonePlayback : MonoBehaviour, ITickable
 
     public void Tick(int tick, float dt)
     {
-        // Past the end of the recording: the echo has replayed its whole [T, present] window.
-        // It does NOT loop and is NOT retired — it stays active and dynamic so gravity and
-        // collisions still apply, but we stop driving it from the recording, so it settles and
-        // freezes in place. It remains registered + captured, so a later rewind still snaps it.
+        // Past the end of the recording: the echo has replayed its whole [T, present] window. It
+        // does NOT loop and is NOT retired — it just stops being driven and lives on as an ordinary
+        // physics body (gravity, friction, collisions, just like the player with no input). It stays
+        // registered + captured, so a rewind back into its window snaps it and resumes the replay.
         if (timeline == null || tick > timeline.LastTick) return;
 
         TickRecord record = timeline.GetAtTick(tick);
@@ -52,7 +49,6 @@ public class ClonePlayback : MonoBehaviour, ITickable
         // else: nothing changed this tick — carry forward the controller's current state
         // (sparse recording; the slice re-established the sticky state at its start).
 
-        // Advance physics every tick so the echo settles naturally under gravity.
-        controller.Tick(tick, dt);
+        controller.Tick(tick, dt); // advance physics each tick so the echo moves as recorded
     }
 }

@@ -56,6 +56,12 @@ public sealed class SparseHistory<T> : IHistory<T> where T : struct, IEquatable<
         _values.RemoveRange(keep, _values.Count - keep);
     }
 
+    public void Clear()
+    {
+        _ticks.Clear();
+        _values.Clear();
+    }
+
     // Keep the last entry at or before windowStart (the anchor that carries the
     // governing value into the window) plus everything after it.
     public void TrimBefore(int windowStartTick)

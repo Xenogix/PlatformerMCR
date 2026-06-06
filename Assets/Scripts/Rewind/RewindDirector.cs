@@ -27,13 +27,21 @@ public sealed class RewindDirector : MonoBehaviour
     [Tooltip("Echo prefab (required) — a Player variant carrying ClonePlayback + RigidbodyChannel + RewindableEntity and NO PlayerCommandInvoker (translucent).")]
     [SerializeField] private GameObject echoPrefab;
 
-    [Tooltip("Playhead scrub speed, in game ticks per real second of held Move-X.")]
-    [SerializeField, Min(1f)] private float scrubTicksPerSecond = 30f;
+    [Tooltip("Initial scrub speed (game ticks per real second) when you start moving the playhead — kept low for precision.")]
+    [SerializeField, Min(1f)] private float scrubTicksPerSecond = 50f;
 
-    [Tooltip("Lane colour used for each clone added to the timeline.")]
-    [SerializeField] private Color cloneColor = new(1f, 0.78f, 0.45f);
+    [Tooltip("Scrub speed reached after holding the direction (ticks per real second) — for fast long rewinds.")]
+    [SerializeField, Min(1f)] private float scrubMaxTicksPerSecond = 300f;
 
-    [Tooltip("Lane colour for the live player's own lane (P1).")]
+    [Tooltip("Seconds of holding the direction to ramp from the initial to the max scrub speed.")]
+    [SerializeField, Min(0f)] private float scrubAccelSeconds = 1.2f;
+
+    [Tooltip("Saturation/Value of the auto-generated per-clone colours (hue is spread by the golden " +
+             "ratio so each clone is visually distinct). Used for both its timeline lane and its echo albedo.")]
+    [SerializeField, Range(0f, 1f)] private float cloneColorSaturation = 0.65f;
+    [SerializeField, Range(0f, 1f)] private float cloneColorValue = 1f;
+
+    [Tooltip("Lane colour for the live player's own lane.")]
     [SerializeField] private Color playerColor = new(0.55f, 0.9f, 1f);
 
     private PlayerCommandInvoker livePlayer;
@@ -45,9 +53,15 @@ public sealed class RewindDirector : MonoBehaviour
     private InputAction cancelAction;   // aborts the scrub, returning to the present
 
     private Mode mode = Mode.Playing;
-    private float scrubTickF; // fractional accumulator for a smooth scrub
+    private float scrubTickF;   // fractional accumulator for a smooth scrub
     private int scrubTick;
-    private int playerLane = -1; // P1's timeline lane
+    private float scrubHeldTime; // how long the scrub direction has been held (drives acceleration)
+    private int playerLane = -1; // Player's timeline lane
+    private int echoSeq;          // unique id per spawned echo (diagnostics)
+
+    // One per clone: its timeline lane and the absolute-tick window it acts over ([spawn, end]),
+    // used to colour that lane's "life" slice when the timeline is opened.
+    private readonly List<(int lane, int start, int end)> clones = new();
 
     private void Start()
     {
@@ -63,7 +77,7 @@ public sealed class RewindDirector : MonoBehaviour
 
         hud?.SetTransport(TransportState.Play);
         hud?.SetTimelineVisible(false); // shown only while the timeline is open for scrubbing
-        if (hud != null && hud.Timeline != null) playerLane = hud.Timeline.AddLane("P1", playerColor);
+        if (hud != null && hud.Timeline != null) playerLane = hud.Timeline.AddLane("Player", playerColor);
     }
 
     // Runs in real time (unscaled), so it keeps working while the game is paused for scrubbing.
@@ -83,20 +97,20 @@ public sealed class RewindDirector : MonoBehaviour
 
         int now = GameClock.Instance.Tick;
         int first = caretaker.FirstCapturedTick;
+        float span = Mathf.Max(1, FurthestTick(now) - first); // right edge = present OR furthest clone end
 
         float moveX = moveAction != null ? moveAction.ReadValue<Vector2>().x : 0f;
-        scrubTickF = Mathf.Clamp(scrubTickF + moveX * scrubTicksPerSecond * Time.unscaledDeltaTime, first, now);
+        // Ramp speed up the longer the direction is held: precise nudges when tapped, fast when held.
+        if (Mathf.Abs(moveX) > 0.15f) scrubHeldTime += Time.unscaledDeltaTime; else scrubHeldTime = 0f;
+        float ramp = scrubAccelSeconds > 0f ? Mathf.Clamp01(scrubHeldTime / scrubAccelSeconds) : 1f;
+        float speed = Mathf.Lerp(scrubTicksPerSecond, scrubMaxTicksPerSecond, ramp);
+        scrubTickF = Mathf.Clamp(scrubTickF + moveX * speed * Time.unscaledDeltaTime, first, now);
         scrubTick = caretaker.SnapToCapture(Mathf.RoundToInt(scrubTickF));
 
         caretaker.Preview(scrubTick);
 
         if (hud != null && hud.Timeline != null)
-        {
-            float span = Mathf.Max(1, now - first);
-            float t01 = (scrubTick - first) / span;
-            hud.Timeline.SetPlayhead(t01);
-            if (playerLane >= 0) hud.Timeline.SetLaneProgress(playerLane, t01);
-        }
+            hud.Timeline.SetPlayhead((scrubTick - first) / span);
 
         // Jump = rewind here AND leave a clone; Timeline (Tab) = rewind here with no clone;
         // Cancel (Esc) = abort and snap back to the present.
@@ -113,9 +127,40 @@ public sealed class RewindDirector : MonoBehaviour
 
         mode = Mode.Scrubbing;
         scrubTickF = scrubTick = GameClock.Instance.Tick;
+        scrubHeldTime = 0f;
         GameClock.Instance.SetPaused(true);
         hud?.SetTimelineVisible(true);
         hud?.SetTransport(TransportState.Rewind);
+        LayoutLaneSpans();
+    }
+
+    // Colour each lane's life window over the (now-frozen) [firstCaptured, now] range: player spans
+    // the whole timeline; each clone spans the [spawn, end] window it replays. Recomputed on every
+    // open because `now` grows between openings, shifting where a fixed tick maps on the bar.
+    private void LayoutLaneSpans()
+    {
+        var caretaker = RewindCaretaker.Instance;
+        if (hud == null || hud.Timeline == null || caretaker == null) return;
+
+        int now = GameClock.Instance.Tick;
+        int first = caretaker.FirstCapturedTick;
+        float span = Mathf.Max(1, FurthestTick(now) - first);
+
+        // Player is alive only up to the present; clones span their full [spawn, end] window, which can
+        // reach past the present (the clock hasn't replayed that far yet) — shown to the right.
+        if (playerLane >= 0) hud.Timeline.SetLaneSegment(playerLane, 0f, (now - first) / span);
+        foreach (var c in clones)
+            hud.Timeline.SetLaneSegment(c.lane, (c.start - first) / span, (c.end - first) / span);
+    }
+
+    // Right edge of the timeline in ticks: the present, or the furthest clone end if a clone still
+    // has actions queued beyond the present (so its full window is visible).
+    private int FurthestTick(int now)
+    {
+        int end = now;
+        for (int i = 0; i < clones.Count; i++)
+            if (clones[i].end > end) end = clones[i].end;
+        return end;
     }
 
     private void CancelScrub()
@@ -153,9 +198,17 @@ public sealed class RewindDirector : MonoBehaviour
         CommandTimeline echoScript = livePlayer.Timeline.SliceFromTick(target);
         livePlayer.Timeline.TruncateAfterTick(target - 1);
 
-        SpawnEcho(echoScript, target);
+        // One colour per clone, shared by its timeline lane and its echo's albedo.
+        Color color = CloneColorFor(clones.Count);
+        SpawnEcho(echoScript, target, color);
 
-        hud?.Timeline?.AddLane("CLONE", cloneColor);
+        // Remember the clone's life window [target, present] so its lane is coloured over exactly
+        // that slice next time the timeline opens.
+        if (hud != null && hud.Timeline != null)
+        {
+            int lane = hud.Timeline.AddLane("Clone", color);
+            if (lane >= 0) clones.Add((lane, target, echoScript.LastTick));
+        }
         hud?.ShowToast("CLONE CREATED");
         Resume();
     }
@@ -168,7 +221,14 @@ public sealed class RewindDirector : MonoBehaviour
         GameClock.Instance.SetPaused(false);
     }
 
-    private void SpawnEcho(CommandTimeline script, int spawnTick)
+    // Distinct colour per clone: spread hues by the golden ratio so successive clones never clash.
+    private Color CloneColorFor(int index)
+    {
+        float hue = (index * 0.61803398875f) % 1f;
+        return Color.HSVToRGB(hue, cloneColorSaturation, cloneColorValue);
+    }
+
+    private void SpawnEcho(CommandTimeline script, int spawnTick, Color color)
     {
         if (echoPrefab == null)
         {
@@ -187,7 +247,25 @@ public sealed class RewindDirector : MonoBehaviour
         GameObject echo = Instantiate(echoPrefab,
             new Vector3(seedPos.x, seedPos.y, src.transform.position.z),
             Quaternion.Euler(0f, 0f, seedRot));
-        echo.name = "Echo";
+        echo.name = $"Echo#{++echoSeq}";
+
+        // Tint this echo with its clone colour (same one used for its timeline lane). Writes the
+        // URP Lit albedo (_BaseColor) on the renderer's own material instance, keeping the existing
+        // alpha so a translucent echo material stays translucent.
+        var mr = echo.GetComponentInChildren<MeshRenderer>();
+        if (mr != null)
+        {
+            var mat = mr.material; // instantiates a unique material for this echo
+            if (mat.HasProperty("_BaseColor"))
+            {
+                float a = mat.GetColor("_BaseColor").a;
+                mat.SetColor("_BaseColor", new Color(color.r, color.g, color.b, a));
+            }
+            else
+            {
+                mat.color = new Color(color.r, color.g, color.b, mat.color.a);
+            }
+        }
 
         var echoRb = echo.GetComponent<Rigidbody2D>();
         if (srcRb != null && echoRb != null)
@@ -200,8 +278,6 @@ public sealed class RewindDirector : MonoBehaviour
         }
 
         echo.GetComponent<ClonePlayback>().Play(script);
-        Debug.Log($"[RewindDirector] Echo spawned at tick {spawnTick}, replay window [{spawnTick}..{script.LastTick}] = {script.LastTick - spawnTick} ticks. " +
-                  $"It replays your recorded actions for that window, then freezes in place (stays visible).");
 
         // Register + capture NOW at spawnTick (a capture-cadence tick) so the echo has an
         // alive record from the moment it exists — otherwise an immediate second rewind to
@@ -226,7 +302,7 @@ public sealed class RewindDirector : MonoBehaviour
         var peers = new List<Collider2D>();
         var playerCol = livePlayer.GetComponent<Collider2D>();
         if (playerCol != null) peers.Add(playerCol);
-        foreach (var other in FindObjectsByType<ClonePlayback>(FindObjectsSortMode.None))
+        foreach (var other in FindObjectsByType<ClonePlayback>())
         {
             if (other.gameObject == echo) continue;
             var c = other.GetComponent<Collider2D>();

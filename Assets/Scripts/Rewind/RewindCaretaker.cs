@@ -11,11 +11,8 @@ public sealed class RewindCaretaker : MonoBehaviour, ITickable
 {
     public static RewindCaretaker Instance { get; private set; }
 
-    [Tooltip("Capture a snapshot every N fixed ticks (~0.1s at 50Hz => 5).")]
-    [SerializeField, Min(1)] private int captureRate = 5;
-
-    [Tooltip("How far back a single rewind jumps, in seconds.")]
-    [SerializeField, Min(0f)] private float rewindOffsetSeconds = 3f;
+    [Tooltip("Capture a snapshot every N fixed ticks. 1 = every tick (smoothest scrubbing, more memory); higher = coarser/cheaper.")]
+    [SerializeField, Min(1)] private int captureRate = 1;
 
     [Tooltip("Sliding history window in seconds: older history is evicted and long-dead objects reclaimed. 0 = unlimited (no eviction).")]
     [SerializeField, Min(0f)] private float windowSeconds = 0f;
@@ -24,7 +21,6 @@ public sealed class RewindCaretaker : MonoBehaviour, ITickable
     private int _firstCapturedTick = -1;
     private bool _hasCaptured;
     private int _lastCapturedTick = int.MinValue; // dedup: never capture the same tick twice (e.g. right after a rewind)
-    private int _offsetTicks;  // rewindOffsetSeconds in ticks (cached; fixed timestep is constant)
     private int _windowTicks;  // windowSeconds in ticks (cached)
 
     public int CurrentTick => GameClock.HasInstance ? GameClock.Instance.Tick : 0;
@@ -39,7 +35,6 @@ public sealed class RewindCaretaker : MonoBehaviour, ITickable
     {
         if (Instance != null && Instance != this) { Destroy(this); return; }
         Instance = this;
-        _offsetTicks = GameClock.SecondsToTicks(rewindOffsetSeconds);
         _windowTicks = GameClock.SecondsToTicks(windowSeconds);
     }
 
@@ -72,7 +67,13 @@ public sealed class RewindCaretaker : MonoBehaviour, ITickable
     private void CaptureAll(int tick)
     {
         if (!_hasCaptured) { _firstCapturedTick = tick; _hasCaptured = true; }
-        for (int i = 0; i < _entities.Count; i++) _entities[i].Capture(tick);
+        for (int i = 0; i < _entities.Count; i++)
+        {
+            // Revive any dormant entity the clock has (re-)entered the lifetime of (a clone the
+            // player rewound past its split point, now replayed back into its window), THEN capture.
+            _entities[i].PrepareCapture(tick);
+            _entities[i].Capture(tick);
+        }
         _lastCapturedTick = tick;
         if (windowSeconds > 0f) EvictAndReclaim(tick);
     }
@@ -136,17 +137,15 @@ public sealed class RewindCaretaker : MonoBehaviour, ITickable
         tick = SnapToCapture(tick);
         for (int i = 0; i < _entities.Count; i++)
         {
+            bool aliveAtTarget = _entities[i].IsAliveAt(tick);
             _entities[i].RestoreTo(tick);
-            _entities[i].DiscardAfter(tick);
+            // Only trim the future of entities that exist at `tick`. A clone whose split point is
+            // AFTER `tick` isn't born yet here: preserve its whole recording so it reappears and
+            // replays its window when the clock plays back into it (instead of being wiped).
+            if (aliveAtTarget) _entities[i].DiscardAfter(tick);
         }
         GameClock.Instance.RewindTo(tick);
         _lastCapturedTick = tick; // target's state is already recorded; don't re-capture it next tick
         return tick;
     }
-
-    /// <summary>
-    /// Legacy instant jump-back by rewindOffsetSeconds. Kept for the old single-key path;
-    /// the timeline flow uses Preview + Commit with a player-chosen tick instead.
-    /// </summary>
-    public int Rewind() => _hasCaptured ? Commit(GameClock.Instance.Tick - _offsetTicks) : -1;
 }
