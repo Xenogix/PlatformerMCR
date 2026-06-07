@@ -26,6 +26,9 @@ public sealed class RewindDirector : MonoBehaviour
     [Tooltip("Lane colour for the live player's own lane.")]
     [SerializeField] private Color playerColor = new(0.55f, 0.9f, 1f);
 
+    [Tooltip("How long (seconds) the one-shot gameplay controls reminder toast stays up at level start.")]
+    [SerializeField, Min(0f)] private float startupHintSeconds = 3.5f;
+
     private PlayerCommandInvoker livePlayer;
     private LevelHud hud;
 
@@ -39,11 +42,11 @@ public sealed class RewindDirector : MonoBehaviour
     private InputAction cancelAction;        // (Timeline map) aborts the scrub, returning to the present
 
     private Mode mode = Mode.Playing;
-    private float scrubTickF;   // fractional accumulator for a smooth scrub
+    private float scrubTickF;       // fractional accumulator for a smooth scrub
     private int scrubTick;
-    private float scrubHeldTime; // how long the scrub direction has been held (drives acceleration)
-    private int playerLane = -1; // Player's timeline lane
-    private int echoSeq;          // unique id per spawned echo (diagnostics)
+    private float scrubHeldTime;    // how long the scrub direction has been held (drives acceleration)
+    private int playerLane = -1;    // Player's timeline lane
+    private int echoSeq;
 
     // One per clone: its timeline lane and the absolute-tick window it acts over ([spawn, end]),
     // used to colour that lane's "life" slice when the timeline is opened.
@@ -74,7 +77,11 @@ public sealed class RewindDirector : MonoBehaviour
 
         hud?.SetTransport(TransportState.Play);
         hud?.SetTimelineVisible(false); // shown only while the timeline is open for scrubbing
-        if (hud != null && hud.Timeline != null) playerLane = hud.Timeline.AddLane("Player", playerColor);
+        hud?.Hint?.ShowGameplay();      // gameplay controls during normal play
+        if (hud != null && hud.Timeline != null)
+        {
+            playerLane = hud.Timeline.AddLane("Player", playerColor);
+        }
     }
 
     // Runs in real time (unscaled), so it keeps working while the game is paused for scrubbing.
@@ -104,6 +111,13 @@ public sealed class RewindDirector : MonoBehaviour
 
         caretaker.Preview(scrubTick);
 
+        // Reflect the scrub direction in the transport indicator: holding left = Rewind, right =
+        // FastForward, idle = Pause. Only push on a change (SetTransport swaps sprites / resets alpha).
+        TransportState desired = moveX < -0.15f ? TransportState.Rewind
+                               : moveX > 0.15f ? TransportState.FastForward
+                               : TransportState.Pause;
+        if (hud != null && hud.Transport != desired) hud.SetTransport(desired);
+
         if (hud != null && hud.Timeline != null)
             hud.Timeline.SetPlayhead((scrubTick - first) / span);
 
@@ -129,7 +143,8 @@ public sealed class RewindDirector : MonoBehaviour
         playerMap?.Disable();
         timelineMap?.Enable();
         hud?.SetTimelineVisible(true);
-        hud?.SetTransport(TransportState.Rewind);
+        hud?.Hint?.ShowTimeline(); // scrub controls while the timeline is open
+        hud?.SetTransport(TransportState.Pause); // opens paused; Update flips to Rewind/FastForward as you scrub
         LayoutLaneSpans();
     }
 
@@ -212,6 +227,7 @@ public sealed class RewindDirector : MonoBehaviour
         timelineMap?.Disable();
         playerMap?.Enable();
         hud?.SetTimelineVisible(false);
+        hud?.Hint?.ShowGameplay(); // back to gameplay controls
         hud?.SetTransport(TransportState.Play);
         GameClock.Instance.SetPaused(false);
     }
@@ -261,9 +277,7 @@ public sealed class RewindDirector : MonoBehaviour
             mr.SetPropertyBlock(mpb);
         }
 
-        // Seed the echo from the player's restored state@target: position, rotation, and velocity
-        // (its carried kinematic velocity). Characters never collide with each other, so a spawn
-        // overlapping the player is harmless — no de-penetration handling needed.
+        // Seed the echo from the player's restored state@target: position, rotation, and velocity.
         var echoRb = echo.GetComponent<Rigidbody2D>();
         if (srcRb != null && echoRb != null)
         {
@@ -272,6 +286,11 @@ public sealed class RewindDirector : MonoBehaviour
             echoRb.linearVelocity = srcRb.linearVelocity;
             echoRb.angularVelocity = srcRb.angularVelocity;
         }
+
+        // The echo spawns deep inside the player (and maybe other echoes). Sync transforms so the
+        // seeded pose is visible to physics queries; PlayerController.ResolveCharacterOverlaps then
+        // suppresses those deep overlaps each tick (before the solver steps) until they separate.
+        Physics2D.SyncTransforms();
 
         echo.GetComponent<ClonePlayback>().Play(script);
 

@@ -58,7 +58,10 @@ public class GameClock : MonoBehaviour
     /// home for the seconds→ticks rule used by jump buffers, rewind offsets, and windows.</summary>
     public static int SecondsToTicks(float seconds) => Mathf.Max(1, Mathf.RoundToInt(seconds / Time.fixedDeltaTime));
 
-    private readonly TickGroup _movers = new TickGroup();
+    // Movers tick bottom-up (sorted by world Y): a carrier ticks before the rider standing on it, so
+    // the rider reads the carrier's FRESH velocity this tick (a jump included) and matches it — instead
+    // of the dynamic solver splitting the jump's momentum between the two stacked bodies.
+    private readonly TickGroup _movers = new TickGroup(orderByHeight: true);
     private readonly TickGroup _observers = new TickGroup();
 
     private void Awake()
@@ -105,6 +108,9 @@ public class GameClock : MonoBehaviour
         private readonly List<ITickable> _live = new List<ITickable>();
         private readonly List<ITickable> _pendingAdd = new List<ITickable>();
         private readonly List<ITickable> _pendingRemove = new List<ITickable>();
+        private readonly bool _orderByHeight;
+
+        public TickGroup(bool orderByHeight = false) => _orderByHeight = orderByHeight;
 
         public void Register(ITickable t)
         {
@@ -130,7 +136,22 @@ public class GameClock : MonoBehaviour
                 _live.AddRange(_pendingAdd);
                 _pendingAdd.Clear();
             }
+            if (_orderByHeight) SortByHeight();
             for (int i = 0; i < _live.Count; i++) _live[i].Tick(tick, dt);
         }
+
+        private void SortByHeight()
+        {
+            for (int i = 1; i < _live.Count; i++)
+            {
+                ITickable item = _live[i];
+                float key = HeightOf(item);
+                int j = i - 1;
+                while (j >= 0 && HeightOf(_live[j]) > key) { _live[j + 1] = _live[j]; j--; }
+                _live[j + 1] = item;
+            }
+        }
+
+        private static float HeightOf(ITickable t) => t is MonoBehaviour mb ? mb.transform.position.y : 0f;
     }
 }
