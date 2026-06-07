@@ -10,20 +10,21 @@ public class InteractionDetector : MonoBehaviour
     public IInteractable GetClosest()
     {
 int count = Physics2D.OverlapCircle(transform.position, interactRadius, new ContactFilter2D { useLayerMask = true, layerMask = interactableLayer }, _hits);
-        
+         Debug.Log($"OverlapCircle hit count: {count} at position {transform.position} radius {interactRadius}");
         IInteractable closest = null;
         float closestDist = float.MaxValue;
 
-        for (int i = 0; i < count; i++)
-        {
-            if (!_hits[i].TryGetComponent<IInteractable>(out var interactable)) continue;
-            float dist = Vector2.Distance(transform.position, _hits[i].transform.position);
-            if (dist < closestDist)
-            {
-                closestDist = dist;
-                closest = interactable;
-            }
-        }
+for (int i = 0; i < count; i++)
+{
+    var interactable = _hits[i].GetComponentInParent<IInteractable>();
+    if (interactable == null) continue;
+    float dist = Vector2.Distance(transform.position, _hits[i].transform.position);
+    if (dist < closestDist)
+    {
+        closestDist = dist;
+        closest = interactable;
+    }
+}
 
         return closest;
     }

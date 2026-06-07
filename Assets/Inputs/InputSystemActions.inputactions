@@ -28,7 +28,16 @@
                     "name": "Timeline",
                     "type": "Button",
                     "id": "a1b2c3d4-0001-4001-8001-000000000001",
-                    "expectedControlType": "Button",
+                    "expectedControlType": "",
+                    "processors": "",
+                    "interactions": "",
+                    "initialStateCheck": false
+                },
+                {
+                    "name": "Use",
+                    "type": "Button",
+                    "id": "107978e1-93ed-4f0c-a6c2-569d4d5cf6ae",
+                    "expectedControlType": "",
                     "processors": "",
                     "interactions": "",
                     "initialStateCheck": false
@@ -219,6 +228,17 @@
                     "processors": "",
                     "groups": "Gamepad",
                     "action": "Timeline",
+                    "isComposite": false,
+                    "isPartOfComposite": false
+                },
+                {
+                    "name": "",
+                    "id": "25f17d8b-1d69-4e12-8d5a-53bfb7c90176",
+                    "path": "<Keyboard>/e",
+                    "interactions": "",
+                    "processors": "",
+                    "groups": "",
+                    "action": "Use",
                     "isComposite": false,
                     "isPartOfComposite": false
                 }

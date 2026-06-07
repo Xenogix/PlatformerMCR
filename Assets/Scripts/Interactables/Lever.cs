@@ -8,6 +8,7 @@ public class Lever : MonoBehaviour, IInteractable
 
     public void Interact()
     {
+        print("Lever toggled");
         isOn = !isOn;
         door.SetOpen(isOn);
     }

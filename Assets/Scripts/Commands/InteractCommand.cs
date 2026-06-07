@@ -7,10 +7,8 @@ public class InteractCommand : ICommand
         this.detector = detector;
     }
 
-    public void Execute()
+    public void Execute(Player target)
     {
         detector.GetClosest()?.Interact();
     }
-
-    public void Undo() { } // will be filled in with Memento later
 }

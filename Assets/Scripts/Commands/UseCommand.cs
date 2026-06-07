@@ -1,3 +1,5 @@
+using UnityEngine;
+
 /// <summary>
 /// Activates whatever the player is currently standing next to (a lever, a button).
 /// Emitted only on the tick the "Use" button was pressed.
@@ -8,5 +10,14 @@
 /// </summary>
 public class UseCommand : ICommand
 {
-    public void Execute(Player target) => target.Use();
+public void Execute(Player target)
+{
+    Debug.Log("UseCommand executed");
+    var detector = target.GetComponent<InteractionDetector>();
+    Debug.Log("Detector: " + detector);
+    var interactable = detector?.GetClosest();
+    Debug.Log("Closest interactable: " + interactable);
+    interactable?.Interact();
+}
+    
 }
