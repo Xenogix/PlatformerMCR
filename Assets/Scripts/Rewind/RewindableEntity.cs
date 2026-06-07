@@ -63,21 +63,13 @@ public sealed class RewindableEntity : MonoBehaviour
 
     public bool IsAliveAt(int tick) => _alive.ValueAtOr(tick, false);
 
-    // Called by the caretaker right before it captures, each capture tick. If this entity is
-    // dormant but the clock has (re-)entered a tick where it is alive — e.g. a clone the live
-    // player rewound past its split point, now replayed back into its window — bring it back:
-    // restore its pose for `tick`, then CLEAR its dense pose-run so the capture that immediately
-    // follows starts a fresh, contiguous recording (DenseHistory is append-only and can't be
-    // re-recorded over). The command recording lives on ClonePlayback and is untouched, so the
-    // clone replays its window again. No-op for already-active entities, so it never fights
-    // forward simulation.
     public void PrepareCapture(int tick)
     {
         if (!_dormant || !_alive.ValueAtOr(tick, false)) return;
-        for (int i = 0; i < _channels.Length; i++) _channels[i].Restore(tick); // rb <- pose@tick
+        for (int i = 0; i < _channels.Length; i++) _channels[i].Restore(tick);
         gameObject.SetActive(true);
         _dormant = false;
-        for (int i = 0; i < _channels.Length; i++) _channels[i].Clear(); // wipe stale run; recaptured fresh from `tick`
+        for (int i = 0; i < _channels.Length; i++) _channels[i].Clear();
     }
 
     // Gameplay "despawn": deactivate and record the transition; never Destroy.

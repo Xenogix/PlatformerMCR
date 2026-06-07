@@ -2,11 +2,12 @@ using System.Collections.Generic;
 using UnityEngine;
 
 // The Caretaker: owns the registry of rewindable entities, the capture cadence, and
-// the instant jump-back. It no longer owns a clock — it rides GameClock as a POST-tick
-// observer (ticked after the movers each fixed tick) so it captures the post-move state
-// of each tick. Input + clone spawning live in the RewindDirector, which calls Rewind()
-// and uses the returned target tick to seed/echo a clone. It never inspects memento
-// contents.
+// the instant jump-back. It no longer owns a clock — it rides GameClock as an OBSERVER
+// (ticked BEFORE the movers each fixed tick) so it captures each tick's ENTERING state:
+// the position+velocity the movers are about to act on. That snapshot is internally
+// consistent, so restoring it and re-running the tick reproduces it exactly (see GameClock).
+// Input + clone spawning live in the RewindDirector, which calls Rewind() and uses the
+// returned target tick to seed/echo a clone. It never inspects memento contents.
 public sealed class RewindCaretaker : MonoBehaviour, ITickable
 {
     public static RewindCaretaker Instance { get; private set; }
@@ -38,11 +39,11 @@ public sealed class RewindCaretaker : MonoBehaviour, ITickable
         _windowTicks = GameClock.SecondsToTicks(windowSeconds);
     }
 
-    private void OnEnable() => GameClock.Instance.RegisterPost(this);
+    private void OnEnable() => GameClock.Instance.RegisterObserver(this);
 
     private void OnDisable()
     {
-        if (GameClock.HasInstance) GameClock.Instance.UnregisterPost(this);
+        if (GameClock.HasInstance) GameClock.Instance.UnregisterObserver(this);
     }
 
     private void OnDestroy()
@@ -57,7 +58,7 @@ public sealed class RewindCaretaker : MonoBehaviour, ITickable
 
     public void Unregister(RewindableEntity e) => _entities.Remove(e);
 
-    // Post-tick: capture the whole world on the capture cadence, after the movers moved.
+    // Observer: capture the whole world on the capture cadence, before the movers act this tick
     public void Tick(int tick, float dt)
     {
         if (tick % captureRate == 0 && tick != _lastCapturedTick)

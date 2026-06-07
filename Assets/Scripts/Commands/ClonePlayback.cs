@@ -28,7 +28,12 @@ public class ClonePlayback : MonoBehaviour, ITickable
     /// <summary>Begin replaying the given recording (its frames carry absolute ticks).</summary>
     public void Play(CommandTimeline recording) => timeline = recording;
 
-    private void OnEnable() => GameClock.Instance.Register(this);
+    private void OnEnable()
+    {
+        GameClock.Instance.Register(this);
+
+        if (player != null) { player.Move(Vector2.zero); player.SetJumpHeld(false); }
+    }
 
     private void OnDisable()
     {
@@ -39,13 +44,6 @@ public class ClonePlayback : MonoBehaviour, ITickable
     {
         if (timeline == null) return;
 
-        // Past the end of the recording: the echo has replayed its whole [T, present] window. It
-        // does NOT loop and is NOT retired — instead it keeps being driven with NEUTRAL input, so
-        // the controller decelerates it to a stop and keeps applying gravity, exactly like the
-        // player standing still with no keys pressed. (The collider is frictionless by design — the
-        // controller, not the physics material, handles stopping; without this the echo would keep
-        // its velocity and slide forever.) It stays registered + captured, so a rewind back into its
-        // window snaps it and resumes the recorded replay.
         if (tick > timeline.LastTick)
         {
             player.Move(Vector2.zero);
