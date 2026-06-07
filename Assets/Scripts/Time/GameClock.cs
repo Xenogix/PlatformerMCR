@@ -63,10 +63,6 @@ public class GameClock : MonoBehaviour
     // of the dynamic solver splitting the jump's momentum between the two stacked bodies.
     private readonly TickGroup _movers = new TickGroup(orderByHeight: true);
     private readonly TickGroup _observers = new TickGroup();
-    // LATE: cross-body resolution that must run after EVERY mover has acted this tick (e.g. a
-    // PushableObstacle summing all pushers' force before deciding to move). Runs after movers,
-    // before the tick increments. Additive — observers/movers behaviour is unchanged.
-    private readonly TickGroup _late = new TickGroup();
 
     private void Awake()
     {
@@ -84,9 +80,6 @@ public class GameClock : MonoBehaviour
     // Observers snapshot the world; they run before the movers each tick (see class summary).
     public void RegisterObserver(ITickable tickable) => _observers.Register(tickable);
     public void UnregisterObserver(ITickable tickable) => _observers.Unregister(tickable);
-    // Late tickables run after all movers each tick (see _late).
-    public void RegisterLate(ITickable tickable) => _late.Register(tickable);
-    public void UnregisterLate(ITickable tickable) => _late.Unregister(tickable);
 
     /// <summary>
     /// Wind the clock back to an earlier tick. The rewind feature calls this so clock-relative
@@ -101,7 +94,6 @@ public class GameClock : MonoBehaviour
         float dt = Time.fixedDeltaTime;
         _observers.Tick(Tick, dt); // snapshot the ENTERING state first (see class summary)
         _movers.Tick(Tick, dt);
-        _late.Tick(Tick, dt);      // cross-body resolution after all movers acted (e.g. pushables)
         Tick++;
     }
 

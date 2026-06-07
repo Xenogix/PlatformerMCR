@@ -23,10 +23,6 @@ public class PlayerController : MonoBehaviour
     [SerializeField] private float lowJumpGravityMultiplier = 3f;
     [SerializeField] private float fallGravityMultiplier = 2.5f;
 
-    [Header("Push")]
-    [Tooltip("Force this character exerts on a PushableObstacle it deliberately presses into. Match the obstacle's pusherForce for honest cooperation calibration.")]
-    [SerializeField] private float pushForce = 30f;
-
     [Header("Ground check")]
     [Tooltip("Layers considered solid for the ground check. ~0 (Everything) works — standing on another character is valid ground (you ride it).")]
     [SerializeField] private LayerMask groundLayer = ~0;
@@ -292,15 +288,13 @@ public class PlayerController : MonoBehaviour
         }
     }
 
-    // One pass over our side contacts (horizontal-dominant normals), doing three things:
+    // One pass over our side contacts (horizontal-dominant normals), doing two things:
     //   1. wall-stop: flag a steep STATIC surface we're pushing into (a slope too steep to walk, or a
     //      wall) so ClampAgainstWalls can cancel the into-wall velocity — otherwise the frictionless
     //      body slides up the diagonal normal and jitters off the ground.
     //   2. side-push: inherit the HORIZONTAL component of a body moving into us (an idle clone gets
     //      shoved; opposing pushers cancel → head-on void). Horizontal only, so it never pollutes
     //      jump height. Returned to fold into baseVelocity.
-    //   3. push-hook: if we deliberately press into an IPushable, exert pushForce on it (it sums all
-    //      pushers in the LATE phase, so N cooperate). Dynamic bodies are coupled, not wall-stopped.
     private Vector2 ScanContacts()
     {
         wallDirX = 0f;
@@ -308,7 +302,6 @@ public class PlayerController : MonoBehaviour
         if (col == null) return sidePush;
         _scannedBodies.Clear();
 
-        float dirSign = Mathf.Abs(direction.x) > 0.01f ? Mathf.Sign(direction.x) : 0f;
         Vector2 myCenter = rb.worldCenterOfMass;
         int n = rb.GetContacts(_contacts);
         for (int i = 0; i < n; i++)
@@ -333,12 +326,6 @@ public class PlayerController : MonoBehaviour
             {
                 float into = Vector2.Dot(otherRb.linearVelocity, nrm); // its speed heading INTO us
                 if (into > 0f) sidePush.x += nrm.x * into;             // inherit the horizontal part only
-            }
-
-            if (dirSign != 0f && Mathf.Sign(-nrm.x) == dirSign)        // pressing toward it?
-            {
-                IPushable pushable = otherCol.GetComponentInParent<IPushable>();
-                if (pushable != null) pushable.ApplyPush(new Vector2(dirSign * pushForce, 0f));
             }
         }
         return sidePush;
