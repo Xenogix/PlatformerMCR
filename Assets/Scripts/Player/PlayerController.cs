@@ -23,6 +23,10 @@ public class PlayerController : MonoBehaviour
     [SerializeField] private float lowJumpGravityMultiplier = 3f;
     [SerializeField] private float fallGravityMultiplier = 2.5f;
 
+    [Header("Push")]
+    [Tooltip("Force this character exerts on a PushableObstacle it deliberately presses into. Match the obstacle's pusherForce for honest cooperation calibration.")]
+    [SerializeField] private float pushForce = 30f;
+
     [Header("Ground check")]
     [Tooltip("Layers considered solid for the ground check. ~0 (Everything) works — standing on another character is valid ground (you ride it).")]
     [SerializeField] private LayerMask groundLayer = ~0;
@@ -86,6 +90,7 @@ public class PlayerController : MonoBehaviour
     // Reusable ground-check buffer. A List (not a fixed array) so it grows to hold every hit instead
     // of silently truncating. Shared statically: queries run on the main thread, consumed synchronously.
     private static readonly List<RaycastHit2D> _groundHits = new();
+    private static readonly List<ContactPoint2D> _contacts = new(); // reused per-tick contact scan for pushing
     private ContactFilter2D _groundFilter; // non-trigger, groundLayer
 
     // One frictionless material shared by all characters: with per-tick velocity control, contact
@@ -170,6 +175,7 @@ public class PlayerController : MonoBehaviour
         velocity = TryJump(velocity);
         rb.linearVelocity = velocity;
 
+        PushContacts();                      // exert pushForce on any IPushable we deliberately press into
         prevGroundVelocity = groundVelocity; // remember for next tick's carry de-pollution
         FireLandEvent();
     }
@@ -276,6 +282,27 @@ public class PlayerController : MonoBehaviour
                 Physics2D.IgnoreCollision(col, other.col, true);   // deep injected overlap → pass through
             else if (ignored && depth > -OverlapClearSkin)
                 Physics2D.IgnoreCollision(col, other.col, false);  // nearly clear → solid again
+        }
+    }
+
+    // If we're actively pressing horizontally into an IPushable we're in contact with, exert pushForce
+    // on it. The obstacle sums all pushers this tick and resolves in the GameClock LATE phase, so N
+    // pushers cooperate; a bystander not pressing toward it contributes nothing.
+    private void PushContacts()
+    {
+        if (col == null || Mathf.Abs(direction.x) < 0.01f) return;
+        float dirSign = Mathf.Sign(direction.x);
+        int n = rb.GetContacts(_contacts);
+        for (int i = 0; i < n; i++)
+        {
+            ContactPoint2D cp = _contacts[i];
+            Collider2D otherCol = (cp.collider != null && cp.collider.attachedRigidbody == rb) ? cp.otherCollider : cp.collider;
+            if (otherCol == null || otherCol.transform.IsChildOf(transform)) continue;
+            IPushable pushable = otherCol.GetComponentInParent<IPushable>();
+            if (pushable == null) continue;
+            float toOtherX = otherCol.bounds.center.x - col.bounds.center.x;   // are we pressing TOWARD it?
+            if (Mathf.Abs(toOtherX) > 0.0001f && Mathf.Sign(toOtherX) == dirSign)
+                pushable.ApplyPush(new Vector2(dirSign * pushForce, 0f));
         }
     }
 
