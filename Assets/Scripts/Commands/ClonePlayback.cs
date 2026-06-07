@@ -17,23 +17,23 @@ public class ClonePlayback : MonoBehaviour, ITickable
 {
     private Player player;
     private PlayerController controller;
-    private RewindableEntity rewindable;
     private CommandTimeline timeline;
 
     private void Awake()
     {
         player = GetComponent<Player>();
         controller = GetComponent<PlayerController>();
-        rewindable = GetComponent<RewindableEntity>();
     }
 
     /// <summary>Begin replaying the given recording (its frames carry absolute ticks).</summary>
     public void Play(CommandTimeline recording) => timeline = recording;
 
-    /// <summary>True once the clock has passed the end of the recording.</summary>
-    public bool Finished => timeline == null || GameClock.Instance.Tick > timeline.LastTick;
+    private void OnEnable()
+    {
+        GameClock.Instance.Register(this);
 
-    private void OnEnable() => GameClock.Instance.Register(this);
+        if (player != null) { player.Move(Vector2.zero); player.SetJumpHeld(false); }
+    }
 
     private void OnDisable()
     {
@@ -42,25 +42,22 @@ public class ClonePlayback : MonoBehaviour, ITickable
 
     public void Tick(int tick, float dt)
     {
-        if (timeline != null)
-        {
-            if (tick > timeline.LastTick)
-            {
-                // Replayed the whole recording — caught up to the present. Retire via the
-                // lifecycle seam (Despawn = deactivate, revivable), NOT Entity.Kill, which is
-                // the gameplay-death path (hazards/out-of-bounds) and would fire death effects.
-                if (rewindable != null) rewindable.Despawn(); else gameObject.SetActive(false);
-                return;
-            }
+        if (timeline == null) return;
 
-            TickRecord record = timeline.GetAtTick(tick);
-            if (record != null)
-                foreach (ICommand cmd in record.Commands) cmd.Execute(player);
-            // else: nothing changed this tick — carry forward the controller's current state
-            // (sparse recording; the slice re-established the sticky state at its start).
+        if (tick > timeline.LastTick)
+        {
+            player.Move(Vector2.zero);
+            player.SetJumpHeld(false);
+            controller.Tick(tick, dt);
+            return;
         }
 
-        // Advance physics every tick so the echo settles naturally under gravity.
-        controller.Tick(tick, dt);
+        TickRecord record = timeline.GetAtTick(tick);
+        if (record != null)
+            foreach (ICommand cmd in record.Commands) cmd.Execute(player);
+        // else: nothing changed this tick — carry forward the controller's current state
+        // (sparse recording; the slice re-established the sticky state at its start).
+
+        controller.Tick(tick, dt); // advance physics each tick so the echo moves as recorded
     }
 }

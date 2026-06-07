@@ -51,6 +51,9 @@ public class PlayerCommandInvoker : MonoBehaviour, ITickable
         if (moveAction == null) Debug.LogError("PlayerCommandInvoker: 'Move' input action not found.");
         if (jumpAction == null) Debug.LogError("PlayerCommandInvoker: 'Jump' input action not found.");
 
+        // No pause-gating needed: while the timeline is open the RewindDirector disables the whole
+        // "Player" action map, so these started callbacks don't fire and nothing latches to leak
+        // into the first tick after resume. (Jump-to-confirm-a-clone is a separate Timeline action.)
         onJumpStarted = _ => jumpPressedThisTick = true;
         onUseStarted = _ => usePressedThisTick = true;
     }

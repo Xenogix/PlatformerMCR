@@ -38,5 +38,8 @@ public sealed class RigidbodyChannel : RewindChannel<RigidbodyState>
         _rb.rotation = s.Rotation;
         _rb.linearVelocity = s.LinearVelocity;
         _rb.angularVelocity = s.AngularVelocity;
+
+        transform.position = new Vector3(s.Position.x, s.Position.y, transform.position.z);
+        transform.rotation = Quaternion.Euler(0f, 0f, s.Rotation);
     }
 }

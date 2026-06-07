@@ -28,6 +28,14 @@ public sealed class DenseHistory<T> : IHistory<T> where T : struct
         return true;
     }
 
+    // Drop everything, resetting to empty so the next Record starts a fresh dense run.
+    public void Clear()
+    {
+        _values.Clear();
+        _baseTick = 0;
+        _step = 0;
+    }
+
     // Rewind: drop every entry recorded strictly after `tick`.
     public void DiscardAfter(int tick)
     {

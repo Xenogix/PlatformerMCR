@@ -61,6 +61,17 @@ public sealed class RewindableEntity : MonoBehaviour
         }
     }
 
+    public bool IsAliveAt(int tick) => _alive.ValueAtOr(tick, false);
+
+    public void PrepareCapture(int tick)
+    {
+        if (!_dormant || !_alive.ValueAtOr(tick, false)) return;
+        for (int i = 0; i < _channels.Length; i++) _channels[i].Restore(tick);
+        gameObject.SetActive(true);
+        _dormant = false;
+        for (int i = 0; i < _channels.Length; i++) _channels[i].Clear();
+    }
+
     // Gameplay "despawn": deactivate and record the transition; never Destroy.
     public void Despawn()
     {

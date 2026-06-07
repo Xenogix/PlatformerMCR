@@ -5,6 +5,12 @@ using UnityEditor;
 
 public class Level : MonoBehaviour
 {
+    [Tooltip("Display name shown on the HUD next to the channel number, e.g. \"THE FIRST STEP\".")]
+    [SerializeField] private string levelName;
+
+    // Name shown by the HUD. Empty falls back to just the channel number.
+    public string LevelName => levelName;
+
     void Start()
     {
 #if UNITY_EDITOR

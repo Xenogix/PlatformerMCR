@@ -2,20 +2,18 @@ using System.Collections.Generic;
 using UnityEngine;
 
 // The Caretaker: owns the registry of rewindable entities, the capture cadence, and
-// the instant jump-back. It no longer owns a clock — it rides GameClock as a POST-tick
-// observer (ticked after the movers each fixed tick) so it captures the post-move state
-// of each tick. Input + clone spawning live in the RewindDirector, which calls Rewind()
-// and uses the returned target tick to seed/echo a clone. It never inspects memento
-// contents.
+// the instant jump-back. It no longer owns a clock — it rides GameClock as an OBSERVER
+// (ticked BEFORE the movers each fixed tick) so it captures each tick's ENTERING state:
+// the position+velocity the movers are about to act on. That snapshot is internally
+// consistent, so restoring it and re-running the tick reproduces it exactly (see GameClock).
+// Input + clone spawning live in the RewindDirector, which calls Rewind() and uses the
+// returned target tick to seed/echo a clone. It never inspects memento contents.
 public sealed class RewindCaretaker : MonoBehaviour, ITickable
 {
     public static RewindCaretaker Instance { get; private set; }
 
-    [Tooltip("Capture a snapshot every N fixed ticks (~0.1s at 50Hz => 5).")]
-    [SerializeField, Min(1)] private int captureRate = 5;
-
-    [Tooltip("How far back a single rewind jumps, in seconds.")]
-    [SerializeField, Min(0f)] private float rewindOffsetSeconds = 3f;
+    [Tooltip("Capture a snapshot every N fixed ticks. 1 = every tick (smoothest scrubbing, more memory); higher = coarser/cheaper.")]
+    [SerializeField, Min(1)] private int captureRate = 1;
 
     [Tooltip("Sliding history window in seconds: older history is evicted and long-dead objects reclaimed. 0 = unlimited (no eviction).")]
     [SerializeField, Min(0f)] private float windowSeconds = 0f;
@@ -24,24 +22,28 @@ public sealed class RewindCaretaker : MonoBehaviour, ITickable
     private int _firstCapturedTick = -1;
     private bool _hasCaptured;
     private int _lastCapturedTick = int.MinValue; // dedup: never capture the same tick twice (e.g. right after a rewind)
-    private int _offsetTicks;  // rewindOffsetSeconds in ticks (cached; fixed timestep is constant)
     private int _windowTicks;  // windowSeconds in ticks (cached)
 
     public int CurrentTick => GameClock.HasInstance ? GameClock.Instance.Tick : 0;
+
+    /// <summary>True once at least one snapshot has been captured (scrubbing is possible).</summary>
+    public bool HasCaptured => _hasCaptured;
+
+    /// <summary>Earliest tick still in history — the left edge of the scrub window.</summary>
+    public int FirstCapturedTick => _firstCapturedTick;
 
     private void Awake()
     {
         if (Instance != null && Instance != this) { Destroy(this); return; }
         Instance = this;
-        _offsetTicks = GameClock.SecondsToTicks(rewindOffsetSeconds);
         _windowTicks = GameClock.SecondsToTicks(windowSeconds);
     }
 
-    private void OnEnable() => GameClock.Instance.RegisterPost(this);
+    private void OnEnable() => GameClock.Instance.RegisterObserver(this);
 
     private void OnDisable()
     {
-        if (GameClock.HasInstance) GameClock.Instance.UnregisterPost(this);
+        if (GameClock.HasInstance) GameClock.Instance.UnregisterObserver(this);
     }
 
     private void OnDestroy()
@@ -56,7 +58,7 @@ public sealed class RewindCaretaker : MonoBehaviour, ITickable
 
     public void Unregister(RewindableEntity e) => _entities.Remove(e);
 
-    // Post-tick: capture the whole world on the capture cadence, after the movers moved.
+    // Observer: capture the whole world on the capture cadence, before the movers act this tick
     public void Tick(int tick, float dt)
     {
         if (tick % captureRate == 0 && tick != _lastCapturedTick)
@@ -66,7 +68,13 @@ public sealed class RewindCaretaker : MonoBehaviour, ITickable
     private void CaptureAll(int tick)
     {
         if (!_hasCaptured) { _firstCapturedTick = tick; _hasCaptured = true; }
-        for (int i = 0; i < _entities.Count; i++) _entities[i].Capture(tick);
+        for (int i = 0; i < _entities.Count; i++)
+        {
+            // Revive any dormant entity the clock has (re-)entered the lifetime of (a clone the
+            // player rewound past its split point, now replayed back into its window), THEN capture.
+            _entities[i].PrepareCapture(tick);
+            _entities[i].Capture(tick);
+        }
         _lastCapturedTick = tick;
         if (windowSeconds > 0f) EvictAndReclaim(tick);
     }
@@ -92,30 +100,35 @@ public sealed class RewindCaretaker : MonoBehaviour, ITickable
         _firstCapturedTick = windowStart;
     }
 
-    /// <summary>
-    /// Jump the world back by rewindOffsetSeconds (snapped down to a capture tick, clamped
-    /// to the first captured tick) and return the resolved target tick — or -1 if nothing
-    /// has been captured yet. The Director uses the target to seed/echo a clone.
-    /// </summary>
-    public int Rewind()
+    public int SnapToCapture(int tick)
     {
-        if (!_hasCaptured) return -1;
-        int now = GameClock.Instance.Tick;
-        int target = now - _offsetTicks;
-        target -= ((target % captureRate) + captureRate) % captureRate; // snap down to a capture tick
-        if (target < _firstCapturedTick) target = _firstCapturedTick;
-        RewindTo(target);
-        return target;
+        int now = GameClock.HasInstance ? GameClock.Instance.Tick : 0;
+        if (tick > now) tick = now;
+        tick -= ((tick % captureRate) + captureRate) % captureRate; // snap down to a capture tick
+        if (tick < _firstCapturedTick) tick = _firstCapturedTick;
+        return tick;
     }
 
-    private void RewindTo(int target)
+    public void Preview(int tick)
     {
+        if (!_hasCaptured) return;
+        tick = SnapToCapture(tick);
+        for (int i = 0; i < _entities.Count; i++) _entities[i].RestoreTo(tick);
+        Physics2D.SyncTransforms(); // align colliders with the restored poses while paused
+    }
+
+    public int Commit(int tick)
+    {
+        if (!_hasCaptured) return -1;
+        tick = SnapToCapture(tick);
         for (int i = 0; i < _entities.Count; i++)
         {
-            _entities[i].RestoreTo(target);
-            _entities[i].DiscardAfter(target);
+            bool aliveAtTarget = _entities[i].IsAliveAt(tick);
+            _entities[i].RestoreTo(tick);
+            if (aliveAtTarget) _entities[i].DiscardAfter(tick);
         }
-        GameClock.Instance.RewindTo(target);
-        _lastCapturedTick = target; // target's state is already recorded; don't re-capture it next tick
+        GameClock.Instance.RewindTo(tick);
+        _lastCapturedTick = tick; // target's state is already recorded; don't re-capture it next tick
+        return tick;
     }
 }
