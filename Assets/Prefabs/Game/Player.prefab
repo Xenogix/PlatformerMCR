@@ -65,6 +65,9 @@ PrefabInstance:
     - targetCorrespondingSourceObject: {fileID: 2227488959991407352, guid: becb5feb27809b847a5082da091d1c31, type: 3}
       insertIndex: -1
       addedObject: {fileID: -2674369485640930539}
+    - targetCorrespondingSourceObject: {fileID: 2227488959991407352, guid: becb5feb27809b847a5082da091d1c31, type: 3}
+      insertIndex: -1
+      addedObject: {fileID: 2534746054218827321}
   m_SourcePrefab: {fileID: 100100000, guid: becb5feb27809b847a5082da091d1c31, type: 3}
 --- !u!1 &8806564704521430294 stripped
 GameObject:
@@ -107,3 +110,19 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 1f2a44223e551d047b3773be31865a77, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::PlayerCommandInvoker
+--- !u!114 &2534746054218827321
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 8806564704521430294}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 57d176a315faa4f18b73a16f26faf1fe, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::InteractionDetector
+  interactRadius: 1.5
+  interactableLayer:
+    serializedVersion: 2
+    m_Bits: 8
