@@ -21,9 +21,6 @@ public sealed class RewindDirector : MonoBehaviour
 {
     private enum Mode { Playing, Scrubbing }
 
-    [Tooltip("Echo mass as a fraction of the player's, so the player shoves echoes around weightlessly.")]
-    [SerializeField, Range(0.01f, 1f)] private float echoMassFactor = 0.2f;
-
     [Tooltip("Echo prefab (required) — a Player variant carrying ClonePlayback + RigidbodyChannel + RewindableEntity and NO PlayerCommandInvoker (translucent).")]
     [SerializeField] private GameObject echoPrefab;
 
@@ -267,6 +264,9 @@ public sealed class RewindDirector : MonoBehaviour
             }
         }
 
+        // Seed the echo from the player's restored state@target: position, rotation, and velocity
+        // (its carried kinematic velocity). Characters never collide with each other, so a spawn
+        // overlapping the player is harmless — no de-penetration handling needed.
         var echoRb = echo.GetComponent<Rigidbody2D>();
         if (srcRb != null && echoRb != null)
         {
@@ -274,7 +274,6 @@ public sealed class RewindDirector : MonoBehaviour
             echoRb.rotation = seedRot;
             echoRb.linearVelocity = srcRb.linearVelocity;
             echoRb.angularVelocity = srcRb.angularVelocity;
-            echoRb.mass = srcRb.mass * echoMassFactor; // weightless-ish: the player shoves it around
         }
 
         echo.GetComponent<ClonePlayback>().Play(script);
@@ -289,26 +288,28 @@ public sealed class RewindDirector : MonoBehaviour
             echoEntity.Capture(spawnTick);
         }
 
-        SetupSpawnOverlapIgnore(echo);
+        SetupSpawnOverlap(echo);
     }
 
-    // Don't let the spawn-overlap with the player (and any echo it spawned inside) pop them
-    // apart: ignore those collisions until they separate.
-    private void SetupSpawnOverlapIgnore(GameObject echo)
+    // The echo spawns ON TOP of the player (and possibly other echoes). Characters are solid, so
+    // mutually pass through each overlapping character until they separate — otherwise the fresh
+    // echo would be stuck against whatever it spawned inside.
+    private void SetupSpawnOverlap(GameObject echo)
     {
         var echoCol = echo.GetComponent<Collider2D>();
-        if (echoCol == null) return;
+        var echoPc = echo.GetComponent<PlayerController>();
+        if (echoCol == null || echoPc == null) return;
 
-        var peers = new List<Collider2D>();
-        var playerCol = livePlayer.GetComponent<Collider2D>();
-        if (playerCol != null) peers.Add(playerCol);
+        if (livePlayer != null) IgnoreEachOther(echoPc, echoCol, livePlayer.gameObject);
         foreach (var other in FindObjectsByType<ClonePlayback>())
-        {
-            if (other.gameObject == echo) continue;
-            var c = other.GetComponent<Collider2D>();
-            if (c != null) peers.Add(c);
-        }
+            if (other.gameObject != echo) IgnoreEachOther(echoPc, echoCol, other.gameObject);
+    }
 
-        echo.AddComponent<IgnoreCollisionUntilClear>().IgnoreWhileOverlapping(peers);
+    private static void IgnoreEachOther(PlayerController echoPc, Collider2D echoCol, GameObject peer)
+    {
+        var peerCol = peer.GetComponent<Collider2D>();
+        var peerPc = peer.GetComponent<PlayerController>();
+        if (peerCol != null) echoPc.IgnorePeerUntilClear(peerCol);
+        if (peerPc != null) peerPc.IgnorePeerUntilClear(echoCol);
     }
 }

@@ -1,6 +1,27 @@
 using System;
+using System.Collections.Generic;
 using UnityEngine;
 
+/// <summary>
+/// Kinematic "collide-and-slide" character controller. The Rigidbody2D is KINEMATIC: it is not
+/// moved by Unity's physics (no gravity, no friction material, no collision pushback). Instead we
+/// own the motion entirely — apply gravity in code, sweep the BoxCollider2D with <see
+/// cref="Rigidbody2D.Cast"/> to find solids, stop at the contact and slide the remainder along the
+/// surface. This is the 2D port of the project's original CharacterController approach: precise,
+/// deterministic, no physics-material friction (so no wall-stick and no momentum loss), and it
+/// keeps the square hitbox.
+///
+/// Characters ARE solid to each other (you can stand on / be blocked by a clone), with one
+/// exception: a pair that spawns OVERLAPPING (an echo created on top of the player/another echo)
+/// ignores each other until they separate — registered via <see cref="IgnorePeerUntilClear"/> and
+/// dropped automatically once clear — so they don't get stuck instead of popping apart. Hazards and
+/// bounds are triggers, so they still fire against a kinematic body and kill via Entity.Kill.
+///
+/// The carried velocity lives in <see cref="Rigidbody2D.linearVelocity"/> (the kinematic body
+/// integrates it for the move, and the rewind RigidbodyChannel captures/restores it unchanged).
+/// Ticked by PlayerCommandInvoker (live) or ClonePlayback (replay) via GameClock — not FixedUpdate
+/// — so the player and every clone run on the same deterministic tick timeline.
+/// </summary>
 [RequireComponent(typeof(Rigidbody2D))]
 [RequireComponent(typeof(Collider2D))]
 public class PlayerController : MonoBehaviour
@@ -21,14 +42,16 @@ public class PlayerController : MonoBehaviour
     [SerializeField] private float fallGravityMultiplier = 2.5f;
 
     [Header("Ground check")]
-    [Tooltip("Layers considered ground. ~0 (Everything) works because the player's own collider is filtered out explicitly.")]
+    [Tooltip("Layers considered solid for movement AND ground. ~0 (Everything) works because other characters are filtered out in code.")]
     [SerializeField] private LayerMask groundLayer = ~0;
     [Tooltip("Footprint of the ground-check box. Default matches a 1-unit cube; widen for more slope tolerance, narrow to avoid catching adjacent walls.")]
     [SerializeField] private Vector2 groundCheckSize = new(1f, 0.1f);
     [Tooltip("How far below the collider's bottom edge to look for ground.")]
     [SerializeField] private float groundCheckDistance = 0.05f;
-    [Tooltip("Surfaces steeper than this (degrees from horizontal) are treated as walls, not ground. Prevents getting stuck against vertical edges between platforms.")]
+    [Tooltip("Surfaces steeper than this (degrees from horizontal) are treated as walls, not ground.")]
     [SerializeField, Range(0f, 89f)] private float maxSlopeAngle = 60f;
+    [Tooltip("Gravity strength = this × Physics2D.gravity. Kept as a field since a kinematic body ignores the Rigidbody2D's own gravityScale.")]
+    [SerializeField] private float gravityScale = 4f;
 
     private Rigidbody2D rb;
     private Collider2D col;
@@ -36,23 +59,22 @@ public class PlayerController : MonoBehaviour
     private Vector2 direction;
     private bool jumpHeld;
     private bool wasGrounded;
-    private float baseGravityScale = 1f;
     private Vector2 groundNormal = Vector2.up;
+    private float gravity; // units/s², cached from gravityScale × Physics2D.gravity in Awake
+
+    // Peers (other characters' colliders) to pass through until they stop overlapping us — set up
+    // when an echo spawns overlapping this character, pruned each tick once separated.
+    private readonly List<Collider2D> _ignoredPeers = new();
 
     // Jump buffering / ground-suppress use fixed-tick timing (not Time.time) so they're
-    // rewind-safe and replay-stable: Time.time keeps marching forward across a rewind, but
-    // tick-based timing moves with the clock, and a clone replaying the same commands
-    // reproduces the same jumps. The two seconds-durations are converted to tick window
-    // lengths once in Awake (the fixed timestep is constant).
+    // rewind-safe and replay-stable: a clone replaying the same commands reproduces the same jumps.
     private const float PostJumpGroundedSuppressSeconds = 0.1f;
-    private int jumpBufferTicks;     // jump-buffer window length, in ticks
-    private int groundSuppressTicks; // post-jump ground-suppress window length, in ticks
+    private int jumpBufferTicks;
+    private int groundSuppressTicks;
 
-    // Jump buffer / ground-suppress are stored as absolute tick STAMPS (not counting-down
-    // counters) and compared against the current tick. That makes them rewind-safe with no
-    // extra channel: after a rewind the current tick moves back while a stamp stays, so the
-    // stamp sits in the future and the "happened recently in the past" window fails — no
-    // phantom jump. A detected backward tick also clears them outright.
+    // Stored as absolute tick STAMPS compared against the current tick — rewind-safe with no extra
+    // channel: after a rewind the current tick moves back while a stamp stays in the future, so the
+    // "happened recently" window fails (no phantom jump). A backward tick also clears them.
     private int lastJumpPressTick = int.MinValue;
     private int lastJumpedTick = int.MinValue;
     private bool jumpRequested;
@@ -67,19 +89,23 @@ public class PlayerController : MonoBehaviour
     public Vector2 Velocity => rb != null ? rb.linearVelocity : Vector2.zero;
     public float MoveSpeed => moveSpeed;
 
+    private static readonly RaycastHit2D[] _groundHits = new RaycastHit2D[8];
+    private static readonly RaycastHit2D[] _moveHits = new RaycastHit2D[8];
+    private ContactFilter2D _solidFilter; // non-trigger, groundLayer; characters filtered in code
+
     private void Awake()
     {
         rb = GetComponent<Rigidbody2D>();
         col = GetComponent<Collider2D>();
+        rb.bodyType = RigidbodyType2D.Kinematic; // we own the motion; no physics integration/friction
         rb.freezeRotation = true;
-        if (rb.gravityScale <= 0f) rb.gravityScale = baseGravityScale;
-        baseGravityScale = rb.gravityScale;
 
+        gravity = Mathf.Abs(Physics2D.gravity.y) * gravityScale;
         jumpBufferTicks = GameClock.SecondsToTicks(jumpBufferTime);
         groundSuppressTicks = GameClock.SecondsToTicks(PostJumpGroundedSuppressSeconds);
 
-        _groundFilter = new ContactFilter2D { useTriggers = false, useLayerMask = true };
-        _groundFilter.SetLayerMask(groundLayer);
+        _solidFilter = new ContactFilter2D { useTriggers = false, useLayerMask = true };
+        _solidFilter.SetLayerMask(groundLayer);
     }
 
     public void SetDirection(Vector2 newDirection) => direction = newDirection;
@@ -89,60 +115,69 @@ public class PlayerController : MonoBehaviour
     public void SetJumpHeld(bool held)
     {
         jumpHeld = held;
-        // Releasing the jump button cancels any pending buffered jump, so a tap doesn't fire
-        // a late jump if the player happens to touch ground during the buffer window.
+        // Releasing cancels a pending buffered jump, so a tap doesn't fire a late jump.
         if (!held) { jumpRequested = false; lastJumpPressTick = int.MinValue; }
     }
 
-    /// <summary>
-    /// Advance one fixed tick. Driven by the player's PlayerCommandInvoker (live) or a
-    /// ClonePlayback (replay) via GameClock — NOT by Unity's FixedUpdate — so the live
-    /// player and every clone run on the exact same deterministic tick timeline.
-    /// </summary>
-    public void Tick(int tick, float dt)
+    // Pass through `peer` (another character's collider) until the two stop overlapping — used so an
+    // echo spawned on top of the player/another echo doesn't get stuck against it instead of popping.
+    public void IgnorePeerUntilClear(Collider2D peer)
     {
-        // A backward tick means the clock was rewound — drop stale jump/suppress stamps so the
-        // restored body doesn't fire a phantom buffered jump or suppress grounding.
-        if (tick < currentTick) { lastJumpPressTick = int.MinValue; lastJumpedTick = int.MinValue; }
-        currentTick = tick;
-
-        // Stamp a freshly latched jump press with this tick.
-        if (jumpRequested) { lastJumpPressTick = tick; jumpRequested = false; }
-
-        IsOnGround = CheckGrounded();
-        ApplyHorizontalMovement(dt);
-        ApplyVariableGravity();
-        TryJump();
-        FireLandEvent();
+        if (peer != null && peer != col && !_ignoredPeers.Contains(peer) && col.Distance(peer).isOverlapped)
+            _ignoredPeers.Add(peer);
     }
 
-    private static readonly RaycastHit2D[] _groundHits = new RaycastHit2D[8];
-    private ContactFilter2D _groundFilter; // configured once in Awake from groundLayer
+    private bool IsIgnored(Collider2D c)
+    {
+        for (int i = 0; i < _ignoredPeers.Count; i++) if (_ignoredPeers[i] == c) return true;
+        return false;
+    }
+
+    private void PruneIgnoredPeers()
+    {
+        for (int i = _ignoredPeers.Count - 1; i >= 0; i--)
+        {
+            Collider2D peer = _ignoredPeers[i];
+            if (peer == null || !col.Distance(peer).isOverlapped) _ignoredPeers.RemoveAt(i);
+        }
+    }
+
+    public void Tick(int tick, float dt)
+    {
+        // A backward tick means the clock was rewound — drop stale jump/suppress stamps.
+        if (tick < currentTick) { lastJumpPressTick = int.MinValue; lastJumpedTick = int.MinValue; }
+        currentTick = tick;
+        if (jumpRequested) { lastJumpPressTick = tick; jumpRequested = false; }
+
+        if (_ignoredPeers.Count > 0) PruneIgnoredPeers(); // re-solidify peers we've separated from
+        IsOnGround = CheckGrounded();
+
+        Vector2 velocity = rb.linearVelocity; // carried over (also what the rewind channel restored)
+        velocity = ApplyHorizontal(velocity, dt);
+        velocity = ApplyGravity(velocity, dt);
+        velocity = TryJump(velocity);
+        velocity = MoveAndSlide(velocity, dt); // sweep + slide; returns the realized velocity
+
+        rb.linearVelocity = velocity; // kinematic body integrates this for the actual move
+        FireLandEvent();
+    }
 
     private bool CheckGrounded()
     {
         if (col == null) return false;
-        // Briefly suppress grounded-detection right after a jump, so the next tick
-        // doesn't re-pin the player to the surface and clobber the jump's vertical
-        // velocity in ApplyHorizontalMovement.
+        // Suppress grounding briefly right after a jump so we don't immediately re-pin to the floor.
         if (lastJumpedTick != int.MinValue && currentTick >= lastJumpedTick
             && currentTick - lastJumpedTick < groundSuppressTicks) return false;
 
-        // BoxCast straight down from just inside the collider's bottom edge.
-        // The cube-wide footprint catches slopes that touch the player's side, and
-        // the cast gives us a surface normal in the same call.
         Bounds b = col.bounds;
         Vector2 origin = new(b.center.x, b.min.y + 0.01f);
-        int count = Physics2D.BoxCast(origin, groundCheckSize, 0f, Vector2.down, _groundFilter, _groundHits, groundCheckDistance + 0.01f);
+        int count = Physics2D.BoxCast(origin, groundCheckSize, 0f, Vector2.down, _solidFilter, _groundHits, groundCheckDistance + 0.01f);
 
         for (int i = 0; i < count; i++)
         {
-            if (_groundHits[i].collider.transform.IsChildOf(transform)) continue;
-            // Reject surfaces steeper than maxSlopeAngle — those are walls, not floors.
-            // Without this, the BoxCast can pick up a vertical platform edge between
-            // gaps and hand back a (nearly) horizontal normal, whose tangent is
-            // vertical and pins the player in place.
-            if (Vector2.Angle(_groundHits[i].normal, Vector2.up) > maxSlopeAngle) continue;
+            Collider2D c = _groundHits[i].collider;
+            if (c.transform.IsChildOf(transform) || IsIgnored(c)) continue; // not self, not a passed-through peer
+            if (Vector2.Angle(_groundHits[i].normal, Vector2.up) > maxSlopeAngle) continue; // walls aren't ground
             groundNormal = _groundHits[i].normal;
             return true;
         }
@@ -150,74 +185,99 @@ public class PlayerController : MonoBehaviour
         return false;
     }
 
-    private void ApplyHorizontalMovement(float dt)
+    private Vector2 ApplyHorizontal(Vector2 velocity, float dt)
     {
         float targetSpeed = direction.x * moveSpeed;
         float rate = Mathf.Abs(direction.x) > 0f ? acceleration : deceleration;
 
-        // SlopeTangent points "right along the surface": for a flat floor this
-        // is (1, 0); for a left-rising slope (normal tilted right) it points
-        // down-right. Multiplying by signed speed walks the player parallel to
-        // the surface, so the velocity carries the player up/down the slope
-        // instead of jamming into its corner.
-        Vector2 tangent = new(groundNormal.y, -groundNormal.x);
-
         if (IsOnGround && !IsJumping)
         {
-            // Project current velocity onto the tangent to get current speed
-            // along the slope, then accelerate/decelerate toward target.
-            float currentSpeed = Vector2.Dot(rb.linearVelocity, tangent);
+            // Walk parallel to the ground: tangent points "right along the surface" (flat => (1,0),
+            // slope => tilted). Driving velocity along it carries the character up/down the slope,
+            // and — crucially — REPLACES the velocity each grounded tick, so no gravity component
+            // accumulates and the character does NOT slide on slopes when idle (target speed 0).
+            Vector2 tangent = new(groundNormal.y, -groundNormal.x);
+            float currentSpeed = Vector2.Dot(velocity, tangent);
             float newSpeed = Mathf.MoveTowards(currentSpeed, targetSpeed, rate * dt);
-            rb.linearVelocity = tangent * newSpeed;
+            return tangent * newSpeed;
         }
-        else
-        {
-            // Airborne: just blend horizontal velocity, preserve Y for jump/fall.
-            float newX = Mathf.MoveTowards(rb.linearVelocity.x, targetSpeed, rate * dt);
-            rb.linearVelocity = new Vector2(newX, rb.linearVelocity.y);
-        }
+
+        // Airborne: blend horizontal, preserve vertical for the jump/fall arc.
+        float newX = Mathf.MoveTowards(velocity.x, targetSpeed, rate * dt);
+        return new Vector2(newX, velocity.y);
     }
 
-    private void ApplyVariableGravity()
+    private Vector2 ApplyGravity(Vector2 velocity, float dt)
     {
-        if (IsOnGround)
-        {
-            rb.gravityScale = baseGravityScale;
-            return;
-        }
+        if (IsOnGround) return velocity; // grounded velocity is fully slope-driven; no gravity => no slide
 
-        if (rb.linearVelocity.y > 0f)
-        {
-            // Ascending. Even with jump held, gravity is heavier than base so
-            // the jump's height is bounded. Releasing jump applies a stronger
-            // multiplier to cut the jump short (variable jump height).
-            float mult = jumpHeld ? ascentGravityMultiplier : lowJumpGravityMultiplier;
-            rb.gravityScale = baseGravityScale * mult;
-        }
-        else if (rb.linearVelocity.y < 0f)
-        {
-            rb.gravityScale = baseGravityScale * fallGravityMultiplier;
-        }
-        else
-        {
-            rb.gravityScale = baseGravityScale;
-        }
+        float mult = velocity.y > 0f
+            ? (jumpHeld ? ascentGravityMultiplier : lowJumpGravityMultiplier) // variable jump height
+            : fallGravityMultiplier;
+        velocity.y -= gravity * mult * dt;
+        return velocity;
     }
 
-    private void TryJump()
+    private Vector2 TryJump(Vector2 velocity)
     {
         bool buffered = lastJumpPressTick != int.MinValue && currentTick >= lastJumpPressTick
                         && currentTick - lastJumpPressTick <= jumpBufferTicks;
         if (buffered && IsOnGround)
         {
-            rb.linearVelocity = new Vector2(rb.linearVelocity.x, jumpForce);
-            lastJumpPressTick = int.MinValue;  // consume the buffered press
-            lastJumpedTick = currentTick;      // start the post-jump ground-suppress window
-            // Immediately mark airborne so this tick's FireLandEvent and the next
-            // tick's CheckGrounded behave consistently.
+            velocity.y = jumpForce;
+            lastJumpPressTick = int.MinValue; // consume the buffered press
+            lastJumpedTick = currentTick;     // start the post-jump ground-suppress window
             IsOnGround = false;
             OnJumped?.Invoke();
         }
+        return velocity;
+    }
+
+    // Sweep the collider by velocity·dt against solids, stopping at the first contact and sliding the
+    // remainder along the surface. Returns the realized velocity (= net move / dt): the kinematic
+    // body integrates it, and components driven into a wall/floor are dropped (so it stops/slides).
+    private Vector2 MoveAndSlide(Vector2 velocity, float dt)
+    {
+        const float skin = 0.01f;
+        const int maxIterations = 4;
+
+        Vector2 delta = velocity * dt;
+        Vector2 moved = Vector2.zero;
+
+        for (int i = 0; i < maxIterations; i++)
+        {
+            float dist = delta.magnitude;
+            if (dist < 1e-6f) break;
+            Vector2 dir = delta / dist;
+
+            RaycastHit2D hit = NearestBlocker(dir, rb.Cast(dir, _solidFilter, _moveHits, dist + skin));
+            if (!hit) { moved += delta; break; } // clear path: take the whole step
+
+            float allowed = Mathf.Max(0f, hit.distance - skin);
+            moved += dir * allowed;
+            // Slide: project the unused remainder along the surface (drop the into-surface part).
+            Vector2 remainder = dir * (dist - allowed);
+            delta = remainder - hit.normal * Vector2.Dot(remainder, hit.normal);
+        }
+
+        return dt > 0f ? moved / dt : Vector2.zero;
+    }
+
+    // Nearest hit that actually OPPOSES the move direction (normal facing back into us). Skips
+    // passed-through peers, and skips surfaces we're only grazing/leaving — crucially the floor
+    // while walking along it (dir·normal ≈ 0), which would otherwise read as a zero-distance block
+    // and freeze horizontal movement. (rb.Cast already excludes our own colliders.) Cast results are
+    // distance-sorted, so the first opposer is the nearest.
+    private RaycastHit2D NearestBlocker(Vector2 dir, int count)
+    {
+        for (int i = 0; i < count; i++)
+        {
+            RaycastHit2D h = _moveHits[i];
+            if (IsIgnored(h.collider)) continue;
+            if (Vector2.Dot(dir, h.normal) >= -1e-4f) continue; // not moving into this surface
+            return h;
+        }
+        return default;
     }
 
     private void FireLandEvent()
@@ -234,12 +294,5 @@ public class PlayerController : MonoBehaviour
         Vector2 boxCenter = new(b.center.x, b.min.y + 0.01f - groundCheckDistance * 0.5f);
         Gizmos.color = Application.isPlaying && IsOnGround ? Color.green : Color.red;
         Gizmos.DrawWireCube(boxCenter, new Vector3(groundCheckSize.x, groundCheckDistance + 0.01f, 0f));
-        // Draw the slope tangent we'd walk along, for debugging.
-        if (Application.isPlaying && IsOnGround)
-        {
-            Gizmos.color = Color.cyan;
-            Vector2 t = new(groundNormal.y, -groundNormal.x);
-            Gizmos.DrawLine(b.center, (Vector2)b.center + t);
-        }
     }
 }
