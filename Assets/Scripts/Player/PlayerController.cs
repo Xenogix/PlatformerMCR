@@ -49,8 +49,10 @@ public class PlayerController : MonoBehaviour
     // Ground state for the current tick, set by CheckGround().
     private Vector2 groundNormal = Vector2.up;
     private Vector2 groundVelocity;     // velocity of the body we stand on (a moving platform / carrier), else zero
-    private Vector2 prevGroundVelocity; // last tick's groundVelocity — measure our own speed against this so a
-                                        // carrier's OWN acceleration isn't absorbed into the resistance (snappy carry)
+    private Vector2 baseVelocity;       // the carry frame: groundVelocity (support) + horizontal side-push from bodies pressing into us
+    private Vector2 prevBaseVelocity;   // last tick's baseVelocity — measure our own speed against this so a carrier's OWN
+                                        // acceleration isn't absorbed into the resistance (snappy carry)
+    private float wallDirX;             // -1/+1: horizontal dir of a blocking steep STATIC wall this tick (0 = none)
 
     private float gravity; // units/s², cached from gravityScale × Physics2D.gravity in Awake
 
@@ -165,7 +167,11 @@ public class PlayerController : MonoBehaviour
 
         IsOnGround = CheckGround();
         if (IsOnGround) lastGroundedTick = currentTick;     // coyote-time window
-        if (rewound) prevGroundVelocity = groundVelocity;   // after a rewind, don't de-pollute against a pre-rewind carrier
+        // Coupling frame for this tick: the surface we ride (groundVelocity) plus the horizontal push
+        // from bodies pressing into our sides. ScanContacts also flags a blocking wall and exerts
+        // pushForce on any IPushable we lean into.
+        baseVelocity = groundVelocity + ScanContacts();
+        if (rewound) prevBaseVelocity = baseVelocity;       // after a rewind, don't de-pollute against a pre-rewind base
 
         // Set the velocity the solver integrates this tick. It then resolves all contacts: walls,
         // ceilings, de-penetration, and keeping a stack of characters from interpenetrating.
@@ -173,10 +179,10 @@ public class PlayerController : MonoBehaviour
         velocity = ApplyHorizontal(velocity, dt);
         velocity = ApplyGravity(velocity, dt);
         velocity = TryJump(velocity);
+        velocity = ClampAgainstWalls(velocity); // cancel into-wall x so a frictionless steep slope can't slide us up (jitter)
         rb.linearVelocity = velocity;
 
-        PushContacts();                      // exert pushForce on any IPushable we deliberately press into
-        prevGroundVelocity = groundVelocity; // remember for next tick's carry de-pollution
+        prevBaseVelocity = baseVelocity;     // remember for next tick's carry de-pollution
         FireLandEvent();
     }
 
@@ -219,13 +225,13 @@ public class PlayerController : MonoBehaviour
             // target is the carrier's own speed, so we're carried on both axes; on static ground it's
             // zero. The tangent follows the surface so we walk up/down slopes without sliding.
             Vector2 tangent = new(groundNormal.y, -groundNormal.x);
-            // Measure our own speed against LAST tick's carrier velocity, not this tick's, so a carrier
+            // Measure our own speed against LAST tick's base velocity, not this tick's, so a carrier
             // that is itself accelerating isn't absorbed into the resistance → we track it rigidly
-            // (snappy carry) instead of friction-lagging up to its speed. Add the CURRENT carrier vel back.
-            float relCurrent = Vector2.Dot(velocity - prevGroundVelocity, tangent);
+            // (snappy carry) instead of friction-lagging up to its speed. Add the CURRENT base vel back.
+            float relCurrent = Vector2.Dot(velocity - prevBaseVelocity, tangent);
             float relTarget = direction.x * moveSpeed;
             float relNew = Mathf.MoveTowards(relCurrent, relTarget, rate * dt);
-            return groundVelocity + tangent * relNew;
+            return baseVelocity + tangent * relNew;
         }
 
         // Airborne: air-control the horizontal, preserve vertical for the jump/fall arc.
@@ -285,25 +291,63 @@ public class PlayerController : MonoBehaviour
         }
     }
 
-    // If we're actively pressing horizontally into an IPushable we're in contact with, exert pushForce
-    // on it. The obstacle sums all pushers this tick and resolves in the GameClock LATE phase, so N
-    // pushers cooperate; a bystander not pressing toward it contributes nothing.
-    private void PushContacts()
+    // One pass over our side contacts (horizontal-dominant normals), doing three things:
+    //   1. wall-stop: flag a steep STATIC surface we're pushing into (a slope too steep to walk, or a
+    //      wall) so ClampAgainstWalls can cancel the into-wall velocity — otherwise the frictionless
+    //      body slides up the diagonal normal and jitters off the ground.
+    //   2. side-push: inherit the HORIZONTAL component of a body moving into us (an idle clone gets
+    //      shoved; opposing pushers cancel → head-on void). Horizontal only, so it never pollutes
+    //      jump height. Returned to fold into baseVelocity.
+    //   3. push-hook: if we deliberately press into an IPushable, exert pushForce on it (it sums all
+    //      pushers in the LATE phase, so N cooperate). Dynamic bodies are coupled, not wall-stopped.
+    private Vector2 ScanContacts()
     {
-        if (col == null || Mathf.Abs(direction.x) < 0.01f) return;
-        float dirSign = Mathf.Sign(direction.x);
+        wallDirX = 0f;
+        Vector2 sidePush = Vector2.zero;
+        if (col == null) return sidePush;
+
+        float dirSign = Mathf.Abs(direction.x) > 0.01f ? Mathf.Sign(direction.x) : 0f;
+        Vector2 myCenter = rb.worldCenterOfMass;
         int n = rb.GetContacts(_contacts);
         for (int i = 0; i < n; i++)
         {
             ContactPoint2D cp = _contacts[i];
             Collider2D otherCol = (cp.collider != null && cp.collider.attachedRigidbody == rb) ? cp.otherCollider : cp.collider;
             if (otherCol == null || otherCol.transform.IsChildOf(transform)) continue;
-            IPushable pushable = otherCol.GetComponentInParent<IPushable>();
-            if (pushable == null) continue;
-            float toOtherX = otherCol.bounds.center.x - col.bounds.center.x;   // are we pressing TOWARD it?
-            if (Mathf.Abs(toOtherX) > 0.0001f && Mathf.Sign(toOtherX) == dirSign)
-                pushable.ApplyPush(new Vector2(dirSign * pushForce, 0f));
+            Rigidbody2D otherRb = otherCol.attachedRigidbody;
+
+            // Orient the contact normal to point INTO us, independent of Unity's convention.
+            Vector2 otherCenter = otherRb != null ? otherRb.worldCenterOfMass : (Vector2)cp.point;
+            Vector2 nrm = cp.normal;
+            if (Vector2.Dot(nrm, myCenter - otherCenter) < 0f) nrm = -nrm;
+            if (Mathf.Abs(nrm.x) <= Mathf.Abs(nrm.y)) continue; // side contacts only (support/ceiling handled elsewhere)
+
+            bool isStatic = otherRb == null || otherRb.bodyType == RigidbodyType2D.Static;
+            if (isStatic && Vector2.Angle(nrm, Vector2.up) > maxSlopeAngle)
+                wallDirX = Mathf.Sign(-nrm.x); // a steep static surface in front of us → block it
+
+            if (otherRb != null)
+            {
+                float into = Vector2.Dot(otherRb.linearVelocity, nrm); // its speed heading INTO us
+                if (into > 0f) sidePush.x += nrm.x * into;             // inherit the horizontal part only
+            }
+
+            if (dirSign != 0f && Mathf.Sign(-nrm.x) == dirSign)        // pressing toward it?
+            {
+                IPushable pushable = otherCol.GetComponentInParent<IPushable>();
+                if (pushable != null) pushable.ApplyPush(new Vector2(dirSign * pushForce, 0f));
+            }
         }
+        return sidePush;
+    }
+
+    // Cancel horizontal velocity heading into a steep static wall (flagged in ScanContacts). Vertical
+    // velocity is untouched, so falling and wall-jumps still work.
+    private Vector2 ClampAgainstWalls(Vector2 velocity)
+    {
+        if (wallDirX != 0f && Mathf.Sign(velocity.x) == wallDirX && Mathf.Abs(velocity.x) > 0.0001f)
+            velocity.x = 0f;
+        return velocity;
     }
 
     private void FireLandEvent()
