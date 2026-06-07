@@ -12,12 +12,17 @@ public class GridBounds : MonoBehaviour
     private GridLevelLayout _grid;
     private BoxCollider2D _box;
 
-    private void OnEnable()
+private void OnEnable()
+{
+    UpdateRefs();
+    if (_grid == null)
     {
-        UpdateRefs();
-        _grid.FieldChanged += Refresh;
-        Refresh();
+        Debug.LogError("GridLevelLayout not found on " + gameObject.name);
+        return;
     }
+    _grid.FieldChanged += Refresh;
+    Refresh();
+}
 
     private void OnDisable()
     {

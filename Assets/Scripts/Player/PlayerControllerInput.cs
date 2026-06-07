@@ -10,7 +10,9 @@ public class PlayerControllerInput : MonoBehaviour
 
     private InputAction moveAction;
     private InputAction jumpAction;
-
+    private InteractionDetector interactionDetector;
+    private InputAction interactAction;
+    private Action<InputAction.CallbackContext> onInteract;
     private Action<InputAction.CallbackContext> onJumpStarted;
     private Action<InputAction.CallbackContext> onJumpCanceled;
 
@@ -21,22 +23,29 @@ public class PlayerControllerInput : MonoBehaviour
 
         moveAction = InputSystem.actions.FindAction("Move");
         jumpAction = InputSystem.actions.FindAction("Jump");
-if (moveAction == null) Debug.LogError("Move action not found!");
-if (jumpAction == null) Debug.LogError("Jump action not found!");
+        if (moveAction == null) Debug.LogError("Move action not found!");
+        if (jumpAction == null) Debug.LogError("Jump action not found!");
         onJumpStarted  = _ => invoker.Execute(new JumpCommand(playerController));
         onJumpCanceled = _ => playerController.SetJumpHeld(false); 
+        interactionDetector = GetComponent<InteractionDetector>();
+        interactAction = InputSystem.actions.FindAction("Interact");
+        onInteract = _ => invoker.Execute(new InteractCommand(interactionDetector));
     }
 
     private void OnEnable()
     {
         jumpAction.started += onJumpStarted;
         jumpAction.canceled += onJumpCanceled;
+        interactAction.started += onInteract;
+
     }
 
     private void OnDisable()
     {
         jumpAction.started -= onJumpStarted;
         jumpAction.canceled -= onJumpCanceled;
+        interactAction.started -= onInteract;
+
     }
 
     private void Update()
