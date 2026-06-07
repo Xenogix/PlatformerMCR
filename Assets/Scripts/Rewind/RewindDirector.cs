@@ -2,21 +2,6 @@ using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.InputSystem;
 
-/// <summary>
-/// Drives the timeline-scrub clone flow and orchestrates echoes. While playing, the
-/// Timeline input opens the timeline and PAUSES the game (GameClock + timeScale 0). The
-/// player then scrubs a playhead with Move-X: each frame the Caretaker PREVIEWS the world
-/// at the scrub tick (non-destructive restore) so the level visibly winds back and forth.
-/// Pressing Jump CONFIRMS: the Caretaker commits the rewind to the chosen tick T and the
-/// live player's recorded command stream is split there — the frozen [T, now] slice drives
-/// a freshly spawned echo (Command replay) while the live player re-records forward from T.
-/// Pressing Timeline again cancels (previews the present) and resumes.
-///
-/// The echo is a copy of the just-restored player, seeded at the player's exact state@T,
-/// and made weightless (low mass) so the player can shove it around; collisions with the
-/// player/other echoes it spawned inside are ignored until they separate, to avoid the
-/// physics pop. The echo carries a RewindableEntity, so a later rewind snaps it back.
-/// </summary>
 public sealed class RewindDirector : MonoBehaviour
 {
     private enum Mode { Playing, Scrubbing }
@@ -44,10 +29,14 @@ public sealed class RewindDirector : MonoBehaviour
     private PlayerCommandInvoker livePlayer;
     private LevelHud hud;
 
-    private InputAction timelineAction; // open, then commit the rewind to the scrub point
-    private InputAction moveAction;     // X axis scrubs the playhead
-    private InputAction jumpAction;     // commits the rewind AND spawns a clone
-    private InputAction cancelAction;   // aborts the scrub, returning to the present
+    private InputActionMap playerMap;   // gameplay (Move/Jump); disabled while scrubbing
+    private InputActionMap timelineMap; // scrub controls; enabled only while scrubbing
+
+    private InputAction openAction;          // (Player map) opens the timeline
+    private InputAction scrubAction;         // (Timeline map) X axis scrubs the playhead
+    private InputAction confirmCloneAction;  // (Timeline map) commits the rewind AND spawns a clone
+    private InputAction confirmRewindAction; // (Timeline map) commits the rewind with no clone
+    private InputAction cancelAction;        // (Timeline map) aborts the scrub, returning to the present
 
     private Mode mode = Mode.Playing;
     private float scrubTickF;   // fractional accumulator for a smooth scrub
@@ -65,12 +54,23 @@ public sealed class RewindDirector : MonoBehaviour
         livePlayer = FindAnyObjectByType<PlayerCommandInvoker>();
         hud = FindAnyObjectByType<LevelHud>();
 
-        timelineAction = InputSystem.actions.FindAction("Timeline");
-        moveAction = InputSystem.actions.FindAction("Move");
-        jumpAction = InputSystem.actions.FindAction("Jump");
-        cancelAction = InputSystem.actions.FindAction("Cancel"); // optional
-        if (timelineAction == null)
-            Debug.LogError("RewindDirector: 'Timeline' input action not found — add it to the project-wide actions.");
+        var actions = InputSystem.actions;
+        playerMap = actions != null ? actions.FindActionMap("Player") : null;
+        timelineMap = actions != null ? actions.FindActionMap("Timeline") : null;
+
+        // The open key lives in the gameplay map (so it works during play); everything else lives
+        // in the Timeline map (so it works only while scrubbing, with the gameplay map disabled).
+        openAction = actions != null ? actions.FindAction("Player/Timeline") : null;
+        scrubAction = timelineMap?.FindAction("Scrub");
+        confirmCloneAction = timelineMap?.FindAction("ConfirmClone");
+        confirmRewindAction = timelineMap?.FindAction("ConfirmRewind");
+        cancelAction = timelineMap?.FindAction("Cancel");
+        if (openAction == null)
+            Debug.LogError("RewindDirector: 'Player/Timeline' input action not found — add it to the project-wide actions.");
+        if (timelineMap == null)
+            Debug.LogError("RewindDirector: 'Timeline' action map not found — add it to the project-wide actions.");
+
+        timelineMap?.Disable(); // scrub controls are inert during normal play; enabled on EnterScrub
 
         hud?.SetTransport(TransportState.Play);
         hud?.SetTimelineVisible(false); // shown only while the timeline is open for scrubbing
@@ -80,11 +80,9 @@ public sealed class RewindDirector : MonoBehaviour
     // Runs in real time (unscaled), so it keeps working while the game is paused for scrubbing.
     private void Update()
     {
-        bool togglePressed = timelineAction != null && timelineAction.WasPressedThisFrame();
-
         if (mode == Mode.Playing)
         {
-            if (togglePressed) EnterScrub();
+            if (openAction != null && openAction.WasPressedThisFrame()) EnterScrub();
             return;
         }
 
@@ -96,7 +94,7 @@ public sealed class RewindDirector : MonoBehaviour
         int first = caretaker.FirstCapturedTick;
         float span = Mathf.Max(1, FurthestTick(now) - first); // right edge = present OR furthest clone end
 
-        float moveX = moveAction != null ? moveAction.ReadValue<Vector2>().x : 0f;
+        float moveX = scrubAction != null ? scrubAction.ReadValue<float>() : 0f;
         // Ramp speed up the longer the direction is held: precise nudges when tapped, fast when held.
         if (Mathf.Abs(moveX) > 0.15f) scrubHeldTime += Time.unscaledDeltaTime; else scrubHeldTime = 0f;
         float ramp = scrubAccelSeconds > 0f ? Mathf.Clamp01(scrubHeldTime / scrubAccelSeconds) : 1f;
@@ -109,10 +107,10 @@ public sealed class RewindDirector : MonoBehaviour
         if (hud != null && hud.Timeline != null)
             hud.Timeline.SetPlayhead((scrubTick - first) / span);
 
-        // Jump = rewind here AND leave a clone; Timeline (Tab) = rewind here with no clone;
-        // Cancel (Esc) = abort and snap back to the present.
-        if (jumpAction != null && jumpAction.WasPressedThisFrame()) ConfirmClone();
-        else if (togglePressed) ConfirmRewind();
+        // ConfirmClone (Space) = rewind here AND leave a clone; ConfirmRewind (Tab) = rewind here
+        // with no clone; Cancel (Esc) = abort and snap back to the present.
+        if (confirmCloneAction != null && confirmCloneAction.WasPressedThisFrame()) ConfirmClone();
+        else if (confirmRewindAction != null && confirmRewindAction.WasPressedThisFrame()) ConfirmRewind();
         else if (cancelAction != null && cancelAction.WasPressedThisFrame()) CancelScrub();
     }
 
@@ -126,14 +124,15 @@ public sealed class RewindDirector : MonoBehaviour
         scrubTickF = scrubTick = GameClock.Instance.Tick;
         scrubHeldTime = 0f;
         GameClock.Instance.SetPaused(true);
+        // Hand input to the timeline: gameplay (Move/Jump) goes inert so the live player can't act
+        // while scrubbing, and the scrub controls come alive. Swapped back in Resume().
+        playerMap?.Disable();
+        timelineMap?.Enable();
         hud?.SetTimelineVisible(true);
         hud?.SetTransport(TransportState.Rewind);
         LayoutLaneSpans();
     }
 
-    // Colour each lane's life window over the (now-frozen) [firstCaptured, now] range: player spans
-    // the whole timeline; each clone spans the [spawn, end] window it replays. Recomputed on every
-    // open because `now` grows between openings, shifting where a fixed tick maps on the bar.
     private void LayoutLaneSpans()
     {
         var caretaker = RewindCaretaker.Instance;
@@ -150,8 +149,6 @@ public sealed class RewindDirector : MonoBehaviour
             hud.Timeline.SetLaneSegment(c.lane, (c.start - first) / span, (c.end - first) / span);
     }
 
-    // Right edge of the timeline in ticks: the present, or the furthest clone end if a clone still
-    // has actions queued beyond the present (so its full window is visible).
     private int FurthestTick(int now)
     {
         int end = now;
@@ -166,8 +163,6 @@ public sealed class RewindDirector : MonoBehaviour
         Resume();
     }
 
-    // Commit the rewind to the scrub point WITHOUT spawning a clone: the world stays in the past
-    // and the live player resumes recording forward from there (the discarded future is gone).
     private void ConfirmRewind()
     {
         var caretaker = RewindCaretaker.Instance;
@@ -213,6 +208,9 @@ public sealed class RewindDirector : MonoBehaviour
     private void Resume()
     {
         mode = Mode.Playing;
+        // Give input back to gameplay and silence the scrub controls (inverse of EnterScrub).
+        timelineMap?.Disable();
+        playerMap?.Enable();
         hud?.SetTimelineVisible(false);
         hud?.SetTransport(TransportState.Play);
         GameClock.Instance.SetPaused(false);
@@ -286,10 +284,5 @@ public sealed class RewindDirector : MonoBehaviour
             RewindCaretaker.Instance.Register(echoEntity);
             echoEntity.Capture(spawnTick);
         }
-
-        // The echo spawns ON TOP of the player (and possibly other echoes). No setup is needed:
-        // PlayerController makes any two characters pass through each other while their colliders
-        // overlap and snap back to solid once separated — computed live, so it also covers an echo
-        // later revived inside another on a rewind.
     }
 }

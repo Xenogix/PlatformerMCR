@@ -40,8 +40,6 @@ public class PlayerCommandInvoker : MonoBehaviour, ITickable
     /// <summary>The recording of everything done so far — handed to a clone on rewind.</summary>
     public CommandTimeline Timeline { get; } = new CommandTimeline();
 
-    private static bool IsPaused => GameClock.HasInstance && GameClock.Instance.IsPaused;
-
     private void Awake()
     {
         player = GetComponent<Player>();
@@ -53,11 +51,11 @@ public class PlayerCommandInvoker : MonoBehaviour, ITickable
         if (moveAction == null) Debug.LogError("PlayerCommandInvoker: 'Move' input action not found.");
         if (jumpAction == null) Debug.LogError("PlayerCommandInvoker: 'Jump' input action not found.");
 
-        // Ignore presses while the game is paused (timeline open): they belong to the scrub UI
-        // (e.g. Jump confirms a clone), and latching them here would fire on the first tick after
-        // resume — making the just-rewound player jump unexpectedly.
-        onJumpStarted = _ => { if (!IsPaused) jumpPressedThisTick = true; };
-        onUseStarted = _ => { if (!IsPaused) usePressedThisTick = true; };
+        // No pause-gating needed: while the timeline is open the RewindDirector disables the whole
+        // "Player" action map, so these started callbacks don't fire and nothing latches to leak
+        // into the first tick after resume. (Jump-to-confirm-a-clone is a separate Timeline action.)
+        onJumpStarted = _ => jumpPressedThisTick = true;
+        onUseStarted = _ => usePressedThisTick = true;
     }
 
     private void OnEnable()
