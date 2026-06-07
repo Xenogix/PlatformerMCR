@@ -17,12 +17,14 @@ public class ClonePlayback : MonoBehaviour, ITickable
 {
     private Player player;
     private PlayerController controller;
+    private RewindableEntity rewindable;
     private CommandTimeline timeline;
 
     private void Awake()
     {
         player = GetComponent<Player>();
         controller = GetComponent<PlayerController>();
+        rewindable = GetComponent<RewindableEntity>();
     }
 
     /// <summary>Begin replaying the given recording (its frames carry absolute ticks).</summary>
@@ -46,9 +48,11 @@ public class ClonePlayback : MonoBehaviour, ITickable
 
         if (tick > timeline.LastTick)
         {
-            player.Move(Vector2.zero);
-            player.SetJumpHeld(false);
-            controller.Tick(tick, dt);
+            // Replay window finished — the echo has caught up to where it was spawned. Retire via the
+            // rewind seam: Despawn = deactivate but RETAIN, so scrubbing back into [spawn, end] revives
+            // it (its alive record now matches its timeline lane). NOT Entity.Kill (the gameplay-death
+            // path, which may fire death effects). On despawn OnDisable unregisters us from the clock.
+            if (rewindable != null) rewindable.Despawn(); else gameObject.SetActive(false);
             return;
         }
 
