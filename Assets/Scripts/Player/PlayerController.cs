@@ -93,6 +93,7 @@ public class PlayerController : MonoBehaviour
     // of silently truncating. Shared statically: queries run on the main thread, consumed synchronously.
     private static readonly List<RaycastHit2D> _groundHits = new();
     private static readonly List<ContactPoint2D> _contacts = new(); // reused per-tick contact scan for pushing
+    private static readonly HashSet<Collider2D> _scannedBodies = new(); // a box-box contact has 2 points; count each body once
     private ContactFilter2D _groundFilter; // non-trigger, groundLayer
 
     // One frictionless material shared by all characters: with per-tick velocity control, contact
@@ -305,6 +306,7 @@ public class PlayerController : MonoBehaviour
         wallDirX = 0f;
         Vector2 sidePush = Vector2.zero;
         if (col == null) return sidePush;
+        _scannedBodies.Clear();
 
         float dirSign = Mathf.Abs(direction.x) > 0.01f ? Mathf.Sign(direction.x) : 0f;
         Vector2 myCenter = rb.worldCenterOfMass;
@@ -314,6 +316,7 @@ public class PlayerController : MonoBehaviour
             ContactPoint2D cp = _contacts[i];
             Collider2D otherCol = (cp.collider != null && cp.collider.attachedRigidbody == rb) ? cp.otherCollider : cp.collider;
             if (otherCol == null || otherCol.transform.IsChildOf(transform)) continue;
+            if (!_scannedBodies.Add(otherCol)) continue; // one push/side-push per body, not per contact point
             Rigidbody2D otherRb = otherCol.attachedRigidbody;
 
             // Orient the contact normal to point INTO us, independent of Unity's convention.
