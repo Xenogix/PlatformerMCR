@@ -15,6 +15,8 @@ public class PlayerController : MonoBehaviour
     [SerializeField] private float jumpForce = 12f;
     [Tooltip("How long a jump press is buffered before landing, in seconds (converted to fixed ticks in Awake).")]
     [SerializeField] private float jumpBufferTime = 0.1f;
+    [Tooltip("Grace period after leaving the ground during which a jump still fires (coyote time), in seconds.")]
+    [SerializeField] private float coyoteTime = 0.1f;
     [Tooltip("Gravity multiplier while ascending with jump held. >1 caps the jump height even when held; ~1.5 gives a generous held jump.")]
     [SerializeField] private float ascentGravityMultiplier = 1.5f;
     [Tooltip("Gravity multiplier while ascending after jump was released (cuts the jump short).")]
@@ -42,7 +44,9 @@ public class PlayerController : MonoBehaviour
 
     // Ground state for the current tick, set by CheckGround().
     private Vector2 groundNormal = Vector2.up;
-    private Vector2 groundVelocity; // velocity of the body we stand on (a moving platform / carrier), else zero
+    private Vector2 groundVelocity;     // velocity of the body we stand on (a moving platform / carrier), else zero
+    private Vector2 prevGroundVelocity; // last tick's groundVelocity — measure our own speed against this so a
+                                        // carrier's OWN acceleration isn't absorbed into the resistance (snappy carry)
 
     private float gravity; // units/s², cached from gravityScale × Physics2D.gravity in Awake
 
@@ -59,12 +63,14 @@ public class PlayerController : MonoBehaviour
     private const float PostJumpGroundedSuppressSeconds = 0.1f;
     private int jumpBufferTicks;
     private int groundSuppressTicks;
+    private int coyoteTicks;
 
     // Stored as absolute tick STAMPS compared against the current tick — rewind-safe with no extra
     // channel: after a rewind the current tick moves back while a stamp stays in the future, so the
     // "happened recently" window fails (no phantom jump). A backward tick also clears them.
     private int lastJumpPressTick = int.MinValue;
     private int lastJumpedTick = int.MinValue;
+    private int lastGroundedTick = int.MinValue; // last grounded tick — the coyote-time window
     private bool jumpRequested;
     private int currentTick;
 
@@ -108,6 +114,7 @@ public class PlayerController : MonoBehaviour
         gravity = Mathf.Abs(Physics2D.gravity.y) * gravityScale;
         jumpBufferTicks = GameClock.SecondsToTicks(jumpBufferTime);
         groundSuppressTicks = GameClock.SecondsToTicks(PostJumpGroundedSuppressSeconds);
+        coyoteTicks = GameClock.SecondsToTicks(coyoteTime);
         // Deep = overlapping by more than a quarter body: a spawn/rewind injection, never a solver
         // contact (which the dynamic solver keeps below the skin). Kept above the clear skin so the
         // hysteresis band is valid.
@@ -143,14 +150,17 @@ public class PlayerController : MonoBehaviour
 
     public void Tick(int tick, float dt)
     {
-        // A backward tick means the clock was rewound — drop stale jump/suppress stamps.
-        if (tick < currentTick) { lastJumpPressTick = int.MinValue; lastJumpedTick = int.MinValue; }
+        // A backward tick means the clock was rewound — drop stale jump/suppress/coyote stamps.
+        bool rewound = tick < currentTick;
+        if (rewound) { lastJumpPressTick = int.MinValue; lastJumpedTick = int.MinValue; lastGroundedTick = int.MinValue; }
         currentTick = tick;
         if (jumpRequested) { lastJumpPressTick = tick; jumpRequested = false; }
 
         ResolveCharacterOverlaps(); // toggle ignore for deep overlaps BEFORE the solver steps this tick
 
         IsOnGround = CheckGround();
+        if (IsOnGround) lastGroundedTick = currentTick;     // coyote-time window
+        if (rewound) prevGroundVelocity = groundVelocity;   // after a rewind, don't de-pollute against a pre-rewind carrier
 
         // Set the velocity the solver integrates this tick. It then resolves all contacts: walls,
         // ceilings, de-penetration, and keeping a stack of characters from interpenetrating.
@@ -160,6 +170,7 @@ public class PlayerController : MonoBehaviour
         velocity = TryJump(velocity);
         rb.linearVelocity = velocity;
 
+        prevGroundVelocity = groundVelocity; // remember for next tick's carry de-pollution
         FireLandEvent();
     }
 
@@ -202,7 +213,10 @@ public class PlayerController : MonoBehaviour
             // target is the carrier's own speed, so we're carried on both axes; on static ground it's
             // zero. The tangent follows the surface so we walk up/down slopes without sliding.
             Vector2 tangent = new(groundNormal.y, -groundNormal.x);
-            float relCurrent = Vector2.Dot(velocity - groundVelocity, tangent);
+            // Measure our own speed against LAST tick's carrier velocity, not this tick's, so a carrier
+            // that is itself accelerating isn't absorbed into the resistance → we track it rigidly
+            // (snappy carry) instead of friction-lagging up to its speed. Add the CURRENT carrier vel back.
+            float relCurrent = Vector2.Dot(velocity - prevGroundVelocity, tangent);
             float relTarget = direction.x * moveSpeed;
             float relNew = Mathf.MoveTowards(relCurrent, relTarget, rate * dt);
             return groundVelocity + tangent * relNew;
@@ -228,11 +242,15 @@ public class PlayerController : MonoBehaviour
     {
         bool buffered = lastJumpPressTick != int.MinValue && currentTick >= lastJumpPressTick
                         && currentTick - lastJumpPressTick <= jumpBufferTicks;
-        if (buffered && IsOnGround)
+        // Coyote time: still jumpable for a short window after leaving the ground.
+        bool coyote = lastGroundedTick != int.MinValue && currentTick >= lastGroundedTick
+                      && currentTick - lastGroundedTick <= coyoteTicks;
+        if (buffered && (IsOnGround || coyote))
         {
             velocity.y = jumpForce + Mathf.Max(0f, groundVelocity.y); // inherit an upward carrier's boost
             lastJumpPressTick = int.MinValue; // consume the buffered press
             lastJumpedTick = currentTick;     // start the post-jump ground-suppress window
+            lastGroundedTick = int.MinValue;  // consume coyote so we can't re-jump in mid-air
             IsOnGround = false;
             OnJumped?.Invoke();
         }
