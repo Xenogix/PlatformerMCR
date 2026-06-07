@@ -100,11 +100,6 @@ public sealed class RewindCaretaker : MonoBehaviour, ITickable
         _firstCapturedTick = windowStart;
     }
 
-    /// <summary>
-    /// Snap an arbitrary tick to a valid rewind target: down to the nearest capture tick,
-    /// clamped to [firstCaptured, now]. Only capture ticks carry snapshots, so both Preview
-    /// and Commit address the world through this.
-    /// </summary>
     public int SnapToCapture(int tick)
     {
         int now = GameClock.HasInstance ? GameClock.Instance.Tick : 0;
@@ -114,11 +109,6 @@ public sealed class RewindCaretaker : MonoBehaviour, ITickable
         return tick;
     }
 
-    /// <summary>
-    /// Non-destructive scrub: restore every entity's visible state to `tick` WITHOUT touching
-    /// history (no DiscardAfter), the clock, or the capture cursor — so the player can sweep the
-    /// playhead back and forth and Cancel by previewing the present. Called while paused.
-    /// </summary>
     public void Preview(int tick)
     {
         if (!_hasCaptured) return;
@@ -127,11 +117,6 @@ public sealed class RewindCaretaker : MonoBehaviour, ITickable
         Physics2D.SyncTransforms(); // align colliders with the restored poses while paused
     }
 
-    /// <summary>
-    /// Commit a rewind to `tick`: restore + discard post-tick history on every entity and wind
-    /// the clock back, so the world resumes forward from there. Returns the resolved (snapped)
-    /// target, or -1 if nothing has been captured yet. The Director uses it to seed/echo a clone.
-    /// </summary>
     public int Commit(int tick)
     {
         if (!_hasCaptured) return -1;
@@ -140,9 +125,6 @@ public sealed class RewindCaretaker : MonoBehaviour, ITickable
         {
             bool aliveAtTarget = _entities[i].IsAliveAt(tick);
             _entities[i].RestoreTo(tick);
-            // Only trim the future of entities that exist at `tick`. A clone whose split point is
-            // AFTER `tick` isn't born yet here: preserve its whole recording so it reappears and
-            // replays its window when the clock plays back into it (instead of being wiped).
             if (aliveAtTarget) _entities[i].DiscardAfter(tick);
         }
         GameClock.Instance.RewindTo(tick);

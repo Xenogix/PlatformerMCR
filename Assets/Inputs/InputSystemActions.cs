@@ -118,15 +118,6 @@ public partial class @InputSystemActions: IInputActionCollection2, IDisposable
                     ""processors"": """",
                     ""interactions"": """",
                     ""initialStateCheck"": false
-                },
-                {
-                    ""name"": ""Cancel"",
-                    ""type"": ""Button"",
-                    ""id"": ""a1b2c3d4-0004-4004-8004-000000000004"",
-                    ""expectedControlType"": ""Button"",
-                    ""processors"": """",
-                    ""interactions"": """",
-                    ""initialStateCheck"": false
                 }
             ],
             ""bindings"": [
@@ -316,10 +307,186 @@ public partial class @InputSystemActions: IInputActionCollection2, IDisposable
                     ""action"": ""Timeline"",
                     ""isComposite"": false,
                     ""isPartOfComposite"": false
+                }
+            ]
+        },
+        {
+            ""name"": ""Timeline"",
+            ""id"": ""b1b2c3d4-0000-4000-8000-000000000000"",
+            ""actions"": [
+                {
+                    ""name"": ""Scrub"",
+                    ""type"": ""Value"",
+                    ""id"": ""b1b2c3d4-0001-4001-8001-000000000001"",
+                    ""expectedControlType"": ""Axis"",
+                    ""processors"": """",
+                    ""interactions"": """",
+                    ""initialStateCheck"": true
+                },
+                {
+                    ""name"": ""ConfirmClone"",
+                    ""type"": ""Button"",
+                    ""id"": ""b1b2c3d4-0002-4002-8002-000000000002"",
+                    ""expectedControlType"": ""Button"",
+                    ""processors"": """",
+                    ""interactions"": """",
+                    ""initialStateCheck"": false
+                },
+                {
+                    ""name"": ""ConfirmRewind"",
+                    ""type"": ""Button"",
+                    ""id"": ""b1b2c3d4-0003-4003-8003-000000000003"",
+                    ""expectedControlType"": ""Button"",
+                    ""processors"": """",
+                    ""interactions"": """",
+                    ""initialStateCheck"": false
+                },
+                {
+                    ""name"": ""Cancel"",
+                    ""type"": ""Button"",
+                    ""id"": ""b1b2c3d4-0004-4004-8004-000000000004"",
+                    ""expectedControlType"": ""Button"",
+                    ""processors"": """",
+                    ""interactions"": """",
+                    ""initialStateCheck"": false
+                }
+            ],
+            ""bindings"": [
+                {
+                    ""name"": ""Arrows"",
+                    ""id"": ""b1b2c3d4-1000-4000-8000-000000000010"",
+                    ""path"": ""1DAxis"",
+                    ""interactions"": """",
+                    ""processors"": """",
+                    ""groups"": """",
+                    ""action"": ""Scrub"",
+                    ""isComposite"": true,
+                    ""isPartOfComposite"": false
+                },
+                {
+                    ""name"": ""negative"",
+                    ""id"": ""b1b2c3d4-1001-4000-8000-000000000011"",
+                    ""path"": ""<Keyboard>/leftArrow"",
+                    ""interactions"": """",
+                    ""processors"": """",
+                    ""groups"": "";Keyboard&Mouse"",
+                    ""action"": ""Scrub"",
+                    ""isComposite"": false,
+                    ""isPartOfComposite"": true
+                },
+                {
+                    ""name"": ""positive"",
+                    ""id"": ""b1b2c3d4-1002-4000-8000-000000000012"",
+                    ""path"": ""<Keyboard>/rightArrow"",
+                    ""interactions"": """",
+                    ""processors"": """",
+                    ""groups"": "";Keyboard&Mouse"",
+                    ""action"": ""Scrub"",
+                    ""isComposite"": false,
+                    ""isPartOfComposite"": true
+                },
+                {
+                    ""name"": ""AD"",
+                    ""id"": ""b1b2c3d4-1003-4000-8000-000000000013"",
+                    ""path"": ""1DAxis"",
+                    ""interactions"": """",
+                    ""processors"": """",
+                    ""groups"": """",
+                    ""action"": ""Scrub"",
+                    ""isComposite"": true,
+                    ""isPartOfComposite"": false
+                },
+                {
+                    ""name"": ""negative"",
+                    ""id"": ""b1b2c3d4-1004-4000-8000-000000000014"",
+                    ""path"": ""<Keyboard>/a"",
+                    ""interactions"": """",
+                    ""processors"": """",
+                    ""groups"": "";Keyboard&Mouse"",
+                    ""action"": ""Scrub"",
+                    ""isComposite"": false,
+                    ""isPartOfComposite"": true
+                },
+                {
+                    ""name"": ""positive"",
+                    ""id"": ""b1b2c3d4-1005-4000-8000-000000000015"",
+                    ""path"": ""<Keyboard>/d"",
+                    ""interactions"": """",
+                    ""processors"": """",
+                    ""groups"": "";Keyboard&Mouse"",
+                    ""action"": ""Scrub"",
+                    ""isComposite"": false,
+                    ""isPartOfComposite"": true
                 },
                 {
                     ""name"": """",
-                    ""id"": ""a1b2c3d4-0005-4005-8005-000000000005"",
+                    ""id"": ""b1b2c3d4-1006-4000-8000-000000000016"",
+                    ""path"": ""<Gamepad>/leftStick/x"",
+                    ""interactions"": """",
+                    ""processors"": """",
+                    ""groups"": ""Gamepad"",
+                    ""action"": ""Scrub"",
+                    ""isComposite"": false,
+                    ""isPartOfComposite"": false
+                },
+                {
+                    ""name"": """",
+                    ""id"": ""b1b2c3d4-1007-4000-8000-000000000017"",
+                    ""path"": ""<Gamepad>/dpad/x"",
+                    ""interactions"": """",
+                    ""processors"": """",
+                    ""groups"": ""Gamepad"",
+                    ""action"": ""Scrub"",
+                    ""isComposite"": false,
+                    ""isPartOfComposite"": false
+                },
+                {
+                    ""name"": """",
+                    ""id"": ""b1b2c3d4-2001-4000-8000-000000000021"",
+                    ""path"": ""<Keyboard>/space"",
+                    ""interactions"": """",
+                    ""processors"": """",
+                    ""groups"": ""Keyboard&Mouse"",
+                    ""action"": ""ConfirmClone"",
+                    ""isComposite"": false,
+                    ""isPartOfComposite"": false
+                },
+                {
+                    ""name"": """",
+                    ""id"": ""b1b2c3d4-2002-4000-8000-000000000022"",
+                    ""path"": ""<Gamepad>/buttonSouth"",
+                    ""interactions"": """",
+                    ""processors"": """",
+                    ""groups"": ""Gamepad"",
+                    ""action"": ""ConfirmClone"",
+                    ""isComposite"": false,
+                    ""isPartOfComposite"": false
+                },
+                {
+                    ""name"": """",
+                    ""id"": ""b1b2c3d4-3001-4000-8000-000000000031"",
+                    ""path"": ""<Keyboard>/tab"",
+                    ""interactions"": """",
+                    ""processors"": """",
+                    ""groups"": ""Keyboard&Mouse"",
+                    ""action"": ""ConfirmRewind"",
+                    ""isComposite"": false,
+                    ""isPartOfComposite"": false
+                },
+                {
+                    ""name"": """",
+                    ""id"": ""b1b2c3d4-3002-4000-8000-000000000032"",
+                    ""path"": ""<Gamepad>/start"",
+                    ""interactions"": """",
+                    ""processors"": """",
+                    ""groups"": ""Gamepad"",
+                    ""action"": ""ConfirmRewind"",
+                    ""isComposite"": false,
+                    ""isPartOfComposite"": false
+                },
+                {
+                    ""name"": """",
+                    ""id"": ""b1b2c3d4-4001-4000-8000-000000000041"",
                     ""path"": ""<Keyboard>/escape"",
                     ""interactions"": """",
                     ""processors"": """",
@@ -330,7 +497,7 @@ public partial class @InputSystemActions: IInputActionCollection2, IDisposable
                 },
                 {
                     ""name"": """",
-                    ""id"": ""a1b2c3d4-0006-4006-8006-000000000006"",
+                    ""id"": ""b1b2c3d4-4002-4000-8000-000000000042"",
                     ""path"": ""<Gamepad>/buttonEast"",
                     ""interactions"": """",
                     ""processors"": """",
@@ -410,12 +577,18 @@ public partial class @InputSystemActions: IInputActionCollection2, IDisposable
         m_Player_Move = m_Player.FindAction("Move", throwIfNotFound: true);
         m_Player_Jump = m_Player.FindAction("Jump", throwIfNotFound: true);
         m_Player_Timeline = m_Player.FindAction("Timeline", throwIfNotFound: true);
-        m_Player_Cancel = m_Player.FindAction("Cancel", throwIfNotFound: true);
+        // Timeline
+        m_Timeline = asset.FindActionMap("Timeline", throwIfNotFound: true);
+        m_Timeline_Scrub = m_Timeline.FindAction("Scrub", throwIfNotFound: true);
+        m_Timeline_ConfirmClone = m_Timeline.FindAction("ConfirmClone", throwIfNotFound: true);
+        m_Timeline_ConfirmRewind = m_Timeline.FindAction("ConfirmRewind", throwIfNotFound: true);
+        m_Timeline_Cancel = m_Timeline.FindAction("Cancel", throwIfNotFound: true);
     }
 
     ~@InputSystemActions()
     {
         UnityEngine.Debug.Assert(!m_Player.enabled, "This will cause a leak and performance issues, InputSystemActions.Player.Disable() has not been called.");
+        UnityEngine.Debug.Assert(!m_Timeline.enabled, "This will cause a leak and performance issues, InputSystemActions.Timeline.Disable() has not been called.");
     }
 
     /// <summary>
@@ -494,7 +667,6 @@ public partial class @InputSystemActions: IInputActionCollection2, IDisposable
     private readonly InputAction m_Player_Move;
     private readonly InputAction m_Player_Jump;
     private readonly InputAction m_Player_Timeline;
-    private readonly InputAction m_Player_Cancel;
     /// <summary>
     /// Provides access to input actions defined in input action map "Player".
     /// </summary>
@@ -518,10 +690,6 @@ public partial class @InputSystemActions: IInputActionCollection2, IDisposable
         /// Provides access to the underlying input action "Player/Timeline".
         /// </summary>
         public InputAction @Timeline => m_Wrapper.m_Player_Timeline;
-        /// <summary>
-        /// Provides access to the underlying input action "Player/Cancel".
-        /// </summary>
-        public InputAction @Cancel => m_Wrapper.m_Player_Cancel;
         /// <summary>
         /// Provides access to the underlying input action map instance.
         /// </summary>
@@ -557,9 +725,6 @@ public partial class @InputSystemActions: IInputActionCollection2, IDisposable
             @Timeline.started += instance.OnTimeline;
             @Timeline.performed += instance.OnTimeline;
             @Timeline.canceled += instance.OnTimeline;
-            @Cancel.started += instance.OnCancel;
-            @Cancel.performed += instance.OnCancel;
-            @Cancel.canceled += instance.OnCancel;
         }
 
         /// <summary>
@@ -580,9 +745,6 @@ public partial class @InputSystemActions: IInputActionCollection2, IDisposable
             @Timeline.started -= instance.OnTimeline;
             @Timeline.performed -= instance.OnTimeline;
             @Timeline.canceled -= instance.OnTimeline;
-            @Cancel.started -= instance.OnCancel;
-            @Cancel.performed -= instance.OnCancel;
-            @Cancel.canceled -= instance.OnCancel;
         }
 
         /// <summary>
@@ -616,6 +778,135 @@ public partial class @InputSystemActions: IInputActionCollection2, IDisposable
     /// Provides a new <see cref="PlayerActions" /> instance referencing this action map.
     /// </summary>
     public PlayerActions @Player => new PlayerActions(this);
+
+    // Timeline
+    private readonly InputActionMap m_Timeline;
+    private List<ITimelineActions> m_TimelineActionsCallbackInterfaces = new List<ITimelineActions>();
+    private readonly InputAction m_Timeline_Scrub;
+    private readonly InputAction m_Timeline_ConfirmClone;
+    private readonly InputAction m_Timeline_ConfirmRewind;
+    private readonly InputAction m_Timeline_Cancel;
+    /// <summary>
+    /// Provides access to input actions defined in input action map "Timeline".
+    /// </summary>
+    public struct TimelineActions
+    {
+        private @InputSystemActions m_Wrapper;
+
+        /// <summary>
+        /// Construct a new instance of the input action map wrapper class.
+        /// </summary>
+        public TimelineActions(@InputSystemActions wrapper) { m_Wrapper = wrapper; }
+        /// <summary>
+        /// Provides access to the underlying input action "Timeline/Scrub".
+        /// </summary>
+        public InputAction @Scrub => m_Wrapper.m_Timeline_Scrub;
+        /// <summary>
+        /// Provides access to the underlying input action "Timeline/ConfirmClone".
+        /// </summary>
+        public InputAction @ConfirmClone => m_Wrapper.m_Timeline_ConfirmClone;
+        /// <summary>
+        /// Provides access to the underlying input action "Timeline/ConfirmRewind".
+        /// </summary>
+        public InputAction @ConfirmRewind => m_Wrapper.m_Timeline_ConfirmRewind;
+        /// <summary>
+        /// Provides access to the underlying input action "Timeline/Cancel".
+        /// </summary>
+        public InputAction @Cancel => m_Wrapper.m_Timeline_Cancel;
+        /// <summary>
+        /// Provides access to the underlying input action map instance.
+        /// </summary>
+        public InputActionMap Get() { return m_Wrapper.m_Timeline; }
+        /// <inheritdoc cref="UnityEngine.InputSystem.InputActionMap.Enable()" />
+        public void Enable() { Get().Enable(); }
+        /// <inheritdoc cref="UnityEngine.InputSystem.InputActionMap.Disable()" />
+        public void Disable() { Get().Disable(); }
+        /// <inheritdoc cref="UnityEngine.InputSystem.InputActionMap.enabled" />
+        public bool enabled => Get().enabled;
+        /// <summary>
+        /// Implicitly converts an <see ref="TimelineActions" /> to an <see ref="InputActionMap" /> instance.
+        /// </summary>
+        public static implicit operator InputActionMap(TimelineActions set) { return set.Get(); }
+        /// <summary>
+        /// Adds <see cref="InputAction.started"/>, <see cref="InputAction.performed"/> and <see cref="InputAction.canceled"/> callbacks provided via <param cref="instance" /> on all input actions contained in this map.
+        /// </summary>
+        /// <param name="instance">Callback instance.</param>
+        /// <remarks>
+        /// If <paramref name="instance" /> is <c>null</c> or <paramref name="instance"/> have already been added this method does nothing.
+        /// </remarks>
+        /// <seealso cref="TimelineActions" />
+        public void AddCallbacks(ITimelineActions instance)
+        {
+            if (instance == null || m_Wrapper.m_TimelineActionsCallbackInterfaces.Contains(instance)) return;
+            m_Wrapper.m_TimelineActionsCallbackInterfaces.Add(instance);
+            @Scrub.started += instance.OnScrub;
+            @Scrub.performed += instance.OnScrub;
+            @Scrub.canceled += instance.OnScrub;
+            @ConfirmClone.started += instance.OnConfirmClone;
+            @ConfirmClone.performed += instance.OnConfirmClone;
+            @ConfirmClone.canceled += instance.OnConfirmClone;
+            @ConfirmRewind.started += instance.OnConfirmRewind;
+            @ConfirmRewind.performed += instance.OnConfirmRewind;
+            @ConfirmRewind.canceled += instance.OnConfirmRewind;
+            @Cancel.started += instance.OnCancel;
+            @Cancel.performed += instance.OnCancel;
+            @Cancel.canceled += instance.OnCancel;
+        }
+
+        /// <summary>
+        /// Removes <see cref="InputAction.started"/>, <see cref="InputAction.performed"/> and <see cref="InputAction.canceled"/> callbacks provided via <param cref="instance" /> on all input actions contained in this map.
+        /// </summary>
+        /// <remarks>
+        /// Calling this method when <paramref name="instance" /> have not previously been registered has no side-effects.
+        /// </remarks>
+        /// <seealso cref="TimelineActions" />
+        private void UnregisterCallbacks(ITimelineActions instance)
+        {
+            @Scrub.started -= instance.OnScrub;
+            @Scrub.performed -= instance.OnScrub;
+            @Scrub.canceled -= instance.OnScrub;
+            @ConfirmClone.started -= instance.OnConfirmClone;
+            @ConfirmClone.performed -= instance.OnConfirmClone;
+            @ConfirmClone.canceled -= instance.OnConfirmClone;
+            @ConfirmRewind.started -= instance.OnConfirmRewind;
+            @ConfirmRewind.performed -= instance.OnConfirmRewind;
+            @ConfirmRewind.canceled -= instance.OnConfirmRewind;
+            @Cancel.started -= instance.OnCancel;
+            @Cancel.performed -= instance.OnCancel;
+            @Cancel.canceled -= instance.OnCancel;
+        }
+
+        /// <summary>
+        /// Unregisters <param cref="instance" /> and unregisters all input action callbacks via <see cref="TimelineActions.UnregisterCallbacks(ITimelineActions)" />.
+        /// </summary>
+        /// <seealso cref="TimelineActions.UnregisterCallbacks(ITimelineActions)" />
+        public void RemoveCallbacks(ITimelineActions instance)
+        {
+            if (m_Wrapper.m_TimelineActionsCallbackInterfaces.Remove(instance))
+                UnregisterCallbacks(instance);
+        }
+
+        /// <summary>
+        /// Replaces all existing callback instances and previously registered input action callbacks associated with them with callbacks provided via <param cref="instance" />.
+        /// </summary>
+        /// <remarks>
+        /// If <paramref name="instance" /> is <c>null</c>, calling this method will only unregister all existing callbacks but not register any new callbacks.
+        /// </remarks>
+        /// <seealso cref="TimelineActions.AddCallbacks(ITimelineActions)" />
+        /// <seealso cref="TimelineActions.RemoveCallbacks(ITimelineActions)" />
+        /// <seealso cref="TimelineActions.UnregisterCallbacks(ITimelineActions)" />
+        public void SetCallbacks(ITimelineActions instance)
+        {
+            foreach (var item in m_Wrapper.m_TimelineActionsCallbackInterfaces)
+                UnregisterCallbacks(item);
+            m_Wrapper.m_TimelineActionsCallbackInterfaces.Clear();
+            AddCallbacks(instance);
+        }
+    }
+    /// <summary>
+    /// Provides a new <see cref="TimelineActions" /> instance referencing this action map.
+    /// </summary>
+    public TimelineActions @Timeline => new TimelineActions(this);
     private int m_KeyboardMouseSchemeIndex = -1;
     /// <summary>
     /// Provides access to the input control scheme.
@@ -709,6 +1000,35 @@ public partial class @InputSystemActions: IInputActionCollection2, IDisposable
         /// <seealso cref="UnityEngine.InputSystem.InputAction.performed" />
         /// <seealso cref="UnityEngine.InputSystem.InputAction.canceled" />
         void OnTimeline(InputAction.CallbackContext context);
+    }
+    /// <summary>
+    /// Interface to implement callback methods for all input action callbacks associated with input actions defined by "Timeline" which allows adding and removing callbacks.
+    /// </summary>
+    /// <seealso cref="TimelineActions.AddCallbacks(ITimelineActions)" />
+    /// <seealso cref="TimelineActions.RemoveCallbacks(ITimelineActions)" />
+    public interface ITimelineActions
+    {
+        /// <summary>
+        /// Method invoked when associated input action "Scrub" is either <see cref="UnityEngine.InputSystem.InputAction.started" />, <see cref="UnityEngine.InputSystem.InputAction.performed" /> or <see cref="UnityEngine.InputSystem.InputAction.canceled" />.
+        /// </summary>
+        /// <seealso cref="UnityEngine.InputSystem.InputAction.started" />
+        /// <seealso cref="UnityEngine.InputSystem.InputAction.performed" />
+        /// <seealso cref="UnityEngine.InputSystem.InputAction.canceled" />
+        void OnScrub(InputAction.CallbackContext context);
+        /// <summary>
+        /// Method invoked when associated input action "ConfirmClone" is either <see cref="UnityEngine.InputSystem.InputAction.started" />, <see cref="UnityEngine.InputSystem.InputAction.performed" /> or <see cref="UnityEngine.InputSystem.InputAction.canceled" />.
+        /// </summary>
+        /// <seealso cref="UnityEngine.InputSystem.InputAction.started" />
+        /// <seealso cref="UnityEngine.InputSystem.InputAction.performed" />
+        /// <seealso cref="UnityEngine.InputSystem.InputAction.canceled" />
+        void OnConfirmClone(InputAction.CallbackContext context);
+        /// <summary>
+        /// Method invoked when associated input action "ConfirmRewind" is either <see cref="UnityEngine.InputSystem.InputAction.started" />, <see cref="UnityEngine.InputSystem.InputAction.performed" /> or <see cref="UnityEngine.InputSystem.InputAction.canceled" />.
+        /// </summary>
+        /// <seealso cref="UnityEngine.InputSystem.InputAction.started" />
+        /// <seealso cref="UnityEngine.InputSystem.InputAction.performed" />
+        /// <seealso cref="UnityEngine.InputSystem.InputAction.canceled" />
+        void OnConfirmRewind(InputAction.CallbackContext context);
         /// <summary>
         /// Method invoked when associated input action "Cancel" is either <see cref="UnityEngine.InputSystem.InputAction.started" />, <see cref="UnityEngine.InputSystem.InputAction.performed" /> or <see cref="UnityEngine.InputSystem.InputAction.canceled" />.
         /// </summary>
