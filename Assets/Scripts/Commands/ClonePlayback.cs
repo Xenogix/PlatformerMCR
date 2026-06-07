@@ -37,11 +37,22 @@ public class ClonePlayback : MonoBehaviour, ITickable
 
     public void Tick(int tick, float dt)
     {
+        if (timeline == null) return;
+
         // Past the end of the recording: the echo has replayed its whole [T, present] window. It
-        // does NOT loop and is NOT retired — it just stops being driven and lives on as an ordinary
-        // physics body (gravity, friction, collisions, just like the player with no input). It stays
-        // registered + captured, so a rewind back into its window snaps it and resumes the replay.
-        if (timeline == null || tick > timeline.LastTick) return;
+        // does NOT loop and is NOT retired — instead it keeps being driven with NEUTRAL input, so
+        // the controller decelerates it to a stop and keeps applying gravity, exactly like the
+        // player standing still with no keys pressed. (The collider is frictionless by design — the
+        // controller, not the physics material, handles stopping; without this the echo would keep
+        // its velocity and slide forever.) It stays registered + captured, so a rewind back into its
+        // window snaps it and resumes the recorded replay.
+        if (tick > timeline.LastTick)
+        {
+            player.Move(Vector2.zero);
+            player.SetJumpHeld(false);
+            controller.Tick(tick, dt);
+            return;
+        }
 
         TickRecord record = timeline.GetAtTick(tick);
         if (record != null)
