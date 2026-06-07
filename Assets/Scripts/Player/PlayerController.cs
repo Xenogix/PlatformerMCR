@@ -2,26 +2,6 @@ using System;
 using System.Collections.Generic;
 using UnityEngine;
 
-/// <summary>
-/// Kinematic "collide-and-slide" character controller. The Rigidbody2D is KINEMATIC: it is not
-/// moved by Unity's physics (no gravity, no friction material, no collision pushback). Instead we
-/// own the motion entirely — apply gravity in code, sweep the BoxCollider2D with <see
-/// cref="Rigidbody2D.Cast"/> to find solids, stop at the contact and slide the remainder along the
-/// surface. This is the 2D port of the project's original CharacterController approach: precise,
-/// deterministic, no physics-material friction (so no wall-stick and no momentum loss), and it
-/// keeps the square hitbox.
-///
-/// Characters ARE solid to each other (you can stand on / be blocked by a clone), with one
-/// exception: a pair that spawns OVERLAPPING (an echo created on top of the player/another echo)
-/// ignores each other until they separate — registered via <see cref="IgnorePeerUntilClear"/> and
-/// dropped automatically once clear — so they don't get stuck instead of popping apart. Hazards and
-/// bounds are triggers, so they still fire against a kinematic body and kill via Entity.Kill.
-///
-/// The carried velocity lives in <see cref="Rigidbody2D.linearVelocity"/> (the kinematic body
-/// integrates it for the move, and the rewind RigidbodyChannel captures/restores it unchanged).
-/// Ticked by PlayerCommandInvoker (live) or ClonePlayback (replay) via GameClock — not FixedUpdate
-/// — so the player and every clone run on the same deterministic tick timeline.
-/// </summary>
 [RequireComponent(typeof(Rigidbody2D))]
 [RequireComponent(typeof(Collider2D))]
 public class PlayerController : MonoBehaviour
@@ -61,10 +41,7 @@ public class PlayerController : MonoBehaviour
     private bool wasGrounded;
     private Vector2 groundNormal = Vector2.up;
     private float gravity; // units/s², cached from gravityScale × Physics2D.gravity in Awake
-
-    // Peers (other characters' colliders) to pass through until they stop overlapping us — set up
-    // when an echo spawns overlapping this character, pruned each tick once separated.
-    private readonly List<Collider2D> _ignoredPeers = new();
+    private float peerPassDepth; // overlap depth (units) past which we pass through a peer; set in Awake
 
     // Jump buffering / ground-suppress use fixed-tick timing (not Time.time) so they're
     // rewind-safe and replay-stable: a clone replaying the same commands reproduces the same jumps.
@@ -89,8 +66,12 @@ public class PlayerController : MonoBehaviour
     public Vector2 Velocity => rb != null ? rb.linearVelocity : Vector2.zero;
     public float MoveSpeed => moveSpeed;
 
-    private static readonly RaycastHit2D[] _groundHits = new RaycastHit2D[8];
-    private static readonly RaycastHit2D[] _moveHits = new RaycastHit2D[8];
+    // Reusable result buffers for the physics queries. Lists (not fixed-size arrays) so they grow
+    // to hold EVERY hit instead of silently truncating at a cap — overlap/sweep counts scale with
+    // the number of stacked clones. Allocate only when growing, then reused. Shared statically:
+    // these queries run on the main thread and consume the results synchronously (no reentrancy).
+    private static readonly List<RaycastHit2D> _groundHits = new();
+    private static readonly List<RaycastHit2D> _moveHits = new();
     private ContactFilter2D _solidFilter; // non-trigger, groundLayer; characters filtered in code
 
     private void Awake()
@@ -103,6 +84,10 @@ public class PlayerController : MonoBehaviour
         gravity = Mathf.Abs(Physics2D.gravity.y) * gravityScale;
         jumpBufferTicks = GameClock.SecondsToTicks(jumpBufferTime);
         groundSuppressTicks = GameClock.SecondsToTicks(PostJumpGroundedSuppressSeconds);
+        // Pass through a peer only when overlapping by more than half a body — a deep, injected
+        // overlap (spawn/revive on top), never the few-mm overshoot a sweep can leave on contact.
+        peerPassDepth = 0.5f * Mathf.Min(col.bounds.size.x, col.bounds.size.y);
+        if (peerPassDepth <= 0f) peerPassDepth = 0.1f; // fallback if bounds aren't ready
 
         _solidFilter = new ContactFilter2D { useTriggers = false, useLayerMask = true };
         _solidFilter.SetLayerMask(groundLayer);
@@ -119,27 +104,20 @@ public class PlayerController : MonoBehaviour
         if (!held) { jumpRequested = false; lastJumpPressTick = int.MinValue; }
     }
 
-    // Pass through `peer` (another character's collider) until the two stop overlapping — used so an
-    // echo spawned on top of the player/another echo doesn't get stuck against it instead of popping.
-    public void IgnorePeerUntilClear(Collider2D peer)
+    // Two characters pass through each other WHILE their colliders overlap (an echo spawned or
+    // revived on top of the player/another echo), and snap back to solid the moment they separate —
+    // so a fresh echo pops free instead of getting stuck against whatever it spawned inside. This is
+    // computed from the live geometry every query, holding NO tracked state, so there is nothing to
+    // rebuild on (re)activation and nothing for a rewind to restore. (A swept kinematic controller
+    // can't de-penetrate an existing overlap on its own — the cast returns a zero-distance hit that
+    // would otherwise freeze it; passing through until clear is the intended resolution.)
+    private bool IsPassThroughPeer(Collider2D other)
     {
-        if (peer != null && peer != col && !_ignoredPeers.Contains(peer) && col.Distance(peer).isOverlapped)
-            _ignoredPeers.Add(peer);
-    }
-
-    private bool IsIgnored(Collider2D c)
-    {
-        for (int i = 0; i < _ignoredPeers.Count; i++) if (_ignoredPeers[i] == c) return true;
-        return false;
-    }
-
-    private void PruneIgnoredPeers()
-    {
-        for (int i = _ignoredPeers.Count - 1; i >= 0; i--)
-        {
-            Collider2D peer = _ignoredPeers[i];
-            if (peer == null || !col.Distance(peer).isOverlapped) _ignoredPeers.RemoveAt(i);
-        }
+        if (other == null) return false;
+        var peer = other.GetComponentInParent<PlayerController>();
+        // DEEP overlap only (> half a body): a deep, injected spawn/revive-on-top overlap, never the
+        // few-mm overshoot a sweep leaves on contact (gating on mere isOverlapped slid them through).
+        return peer != null && peer != this && col.Distance(other).distance < -peerPassDepth;
     }
 
     public void Tick(int tick, float dt)
@@ -149,7 +127,6 @@ public class PlayerController : MonoBehaviour
         currentTick = tick;
         if (jumpRequested) { lastJumpPressTick = tick; jumpRequested = false; }
 
-        if (_ignoredPeers.Count > 0) PruneIgnoredPeers(); // re-solidify peers we've separated from
         IsOnGround = CheckGrounded();
 
         Vector2 velocity = rb.linearVelocity; // carried over (also what the rewind channel restored)
@@ -176,7 +153,7 @@ public class PlayerController : MonoBehaviour
         for (int i = 0; i < count; i++)
         {
             Collider2D c = _groundHits[i].collider;
-            if (c.transform.IsChildOf(transform) || IsIgnored(c)) continue; // not self, not a passed-through peer
+            if (c.transform.IsChildOf(transform) || IsPassThroughPeer(c)) continue; // not self, not a peer we overlap
             if (Vector2.Angle(_groundHits[i].normal, Vector2.up) > maxSlopeAngle) continue; // walls aren't ground
             groundNormal = _groundHits[i].normal;
             return true;
@@ -192,10 +169,6 @@ public class PlayerController : MonoBehaviour
 
         if (IsOnGround && !IsJumping)
         {
-            // Walk parallel to the ground: tangent points "right along the surface" (flat => (1,0),
-            // slope => tilted). Driving velocity along it carries the character up/down the slope,
-            // and — crucially — REPLACES the velocity each grounded tick, so no gravity component
-            // accumulates and the character does NOT slide on slopes when idle (target speed 0).
             Vector2 tangent = new(groundNormal.y, -groundNormal.x);
             float currentSpeed = Vector2.Dot(velocity, tangent);
             float newSpeed = Mathf.MoveTowards(currentSpeed, targetSpeed, rate * dt);
@@ -233,9 +206,6 @@ public class PlayerController : MonoBehaviour
         return velocity;
     }
 
-    // Sweep the collider by velocity·dt against solids, stopping at the first contact and sliding the
-    // remainder along the surface. Returns the realized velocity (= net move / dt): the kinematic
-    // body integrates it, and components driven into a wall/floor are dropped (so it stops/slides).
     private Vector2 MoveAndSlide(Vector2 velocity, float dt)
     {
         const float skin = 0.01f;
@@ -263,17 +233,12 @@ public class PlayerController : MonoBehaviour
         return dt > 0f ? moved / dt : Vector2.zero;
     }
 
-    // Nearest hit that actually OPPOSES the move direction (normal facing back into us). Skips
-    // passed-through peers, and skips surfaces we're only grazing/leaving — crucially the floor
-    // while walking along it (dir·normal ≈ 0), which would otherwise read as a zero-distance block
-    // and freeze horizontal movement. (rb.Cast already excludes our own colliders.) Cast results are
-    // distance-sorted, so the first opposer is the nearest.
     private RaycastHit2D NearestBlocker(Vector2 dir, int count)
     {
         for (int i = 0; i < count; i++)
         {
             RaycastHit2D h = _moveHits[i];
-            if (IsIgnored(h.collider)) continue;
+            if (IsPassThroughPeer(h.collider)) continue;
             if (Vector2.Dot(dir, h.normal) >= -1e-4f) continue; // not moving into this surface
             return h;
         }

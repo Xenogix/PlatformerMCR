@@ -4,9 +4,16 @@ using UnityEngine;
 /// <summary>
 /// Single source of "game time", advancing one fixed tick per FixedUpdate. Each tick it runs
 /// two groups with the same integer tick index, then increments it:
-///   1. MOVERS (player invoker, clone playbacks) — set velocities for this tick.
-///   2. OBSERVERS (the rewind caretaker) — run AFTER the movers, so they capture this tick's
-///      post-move state.
+///   1. OBSERVERS (the rewind caretaker) — run FIRST, snapshotting each tick's ENTERING state:
+///      the position and velocity the movers are about to act on. This pairing is consistent
+///      (the body hasn't been advanced by this tick yet), so restoring it and re-running the
+///      tick reproduces the tick exactly. Capturing AFTER the movers stored a velocity already
+///      advanced by this tick's gravity/acceleration, which a rewind would then advance a
+///      SECOND time (an extra tick of gravity per commit) — that is the bug this ordering fixes.
+///      Reviving a dormant entity here (PrepareCapture) also registers it into the mover group
+///      in time to tick THIS frame, so a clone replayed back into its window resumes on its
+///      spawn tick rather than one tick late.
+///   2. MOVERS (player invoker, clone playbacks) — set velocities for this tick.
 /// Created lazily, so a GameClock object need not be placed in the scene.
 /// </summary>
 public class GameClock : MonoBehaviour
@@ -67,8 +74,9 @@ public class GameClock : MonoBehaviour
 
     public void Register(ITickable tickable) => _movers.Register(tickable);
     public void Unregister(ITickable tickable) => _movers.Unregister(tickable);
-    public void RegisterPost(ITickable tickable) => _observers.Register(tickable);
-    public void UnregisterPost(ITickable tickable) => _observers.Unregister(tickable);
+    // Observers snapshot the world; they run before the movers each tick (see class summary).
+    public void RegisterObserver(ITickable tickable) => _observers.Register(tickable);
+    public void UnregisterObserver(ITickable tickable) => _observers.Unregister(tickable);
 
     /// <summary>
     /// Wind the clock back to an earlier tick. The rewind feature calls this so clock-relative
@@ -81,8 +89,8 @@ public class GameClock : MonoBehaviour
     {
         if (IsPaused) return; // frozen while scrubbing; timeScale 0 already stops this, kept explicit
         float dt = Time.fixedDeltaTime;
+        _observers.Tick(Tick, dt); // snapshot the ENTERING state first (see class summary)
         _movers.Tick(Tick, dt);
-        _observers.Tick(Tick, dt);
         Tick++;
     }
 

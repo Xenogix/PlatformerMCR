@@ -246,22 +246,21 @@ public sealed class RewindDirector : MonoBehaviour
             Quaternion.Euler(0f, 0f, seedRot));
         echo.name = $"Echo#{++echoSeq}";
 
-        // Tint this echo with its clone colour (same one used for its timeline lane). Writes the
-        // URP Lit albedo (_BaseColor) on the renderer's own material instance, keeping the existing
-        // alpha so a translucent echo material stays translucent.
+        // Tint this echo with its clone colour (same one used for its timeline lane) via a
+        // MaterialPropertyBlock — a per-renderer override, so NO unique material instance is
+        // created (mr.material would, and that instance leaks when the echo is later reclaimed).
+        // Keep the shared material's alpha so a translucent echo stays translucent.
         var mr = echo.GetComponentInChildren<MeshRenderer>();
         if (mr != null)
         {
-            var mat = mr.material; // instantiates a unique material for this echo
-            if (mat.HasProperty("_BaseColor"))
-            {
-                float a = mat.GetColor("_BaseColor").a;
-                mat.SetColor("_BaseColor", new Color(color.r, color.g, color.b, a));
-            }
-            else
-            {
-                mat.color = new Color(color.r, color.g, color.b, mat.color.a);
-            }
+            Material shared = mr.sharedMaterial;
+            bool urp = shared != null && shared.HasProperty("_BaseColor");
+            float alpha = shared == null ? 1f : (urp ? shared.GetColor("_BaseColor").a : shared.color.a);
+
+            var mpb = new MaterialPropertyBlock();
+            mr.GetPropertyBlock(mpb);
+            mpb.SetColor(urp ? "_BaseColor" : "_Color", new Color(color.r, color.g, color.b, alpha));
+            mr.SetPropertyBlock(mpb);
         }
 
         // Seed the echo from the player's restored state@target: position, rotation, and velocity
@@ -288,28 +287,9 @@ public sealed class RewindDirector : MonoBehaviour
             echoEntity.Capture(spawnTick);
         }
 
-        SetupSpawnOverlap(echo);
-    }
-
-    // The echo spawns ON TOP of the player (and possibly other echoes). Characters are solid, so
-    // mutually pass through each overlapping character until they separate — otherwise the fresh
-    // echo would be stuck against whatever it spawned inside.
-    private void SetupSpawnOverlap(GameObject echo)
-    {
-        var echoCol = echo.GetComponent<Collider2D>();
-        var echoPc = echo.GetComponent<PlayerController>();
-        if (echoCol == null || echoPc == null) return;
-
-        if (livePlayer != null) IgnoreEachOther(echoPc, echoCol, livePlayer.gameObject);
-        foreach (var other in FindObjectsByType<ClonePlayback>())
-            if (other.gameObject != echo) IgnoreEachOther(echoPc, echoCol, other.gameObject);
-    }
-
-    private static void IgnoreEachOther(PlayerController echoPc, Collider2D echoCol, GameObject peer)
-    {
-        var peerCol = peer.GetComponent<Collider2D>();
-        var peerPc = peer.GetComponent<PlayerController>();
-        if (peerCol != null) echoPc.IgnorePeerUntilClear(peerCol);
-        if (peerPc != null) peerPc.IgnorePeerUntilClear(echoCol);
+        // The echo spawns ON TOP of the player (and possibly other echoes). No setup is needed:
+        // PlayerController makes any two characters pass through each other while their colliders
+        // overlap and snap back to solid once separated — computed live, so it also covers an echo
+        // later revived inside another on a rewind.
     }
 }

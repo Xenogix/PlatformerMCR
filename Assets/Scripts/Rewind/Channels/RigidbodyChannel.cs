@@ -39,10 +39,6 @@ public sealed class RigidbodyChannel : RewindChannel<RigidbodyState>
         _rb.linearVelocity = s.LinearVelocity;
         _rb.angularVelocity = s.AngularVelocity;
 
-        // Also push the pose onto the Transform. Rigidbody2D.position only reaches the Transform
-        // on the next physics step, but while the timeline is open the clock is paused
-        // (timeScale 0) so no step runs — without this, scrubbing would be invisible. Harmless
-        // during normal play: the next physics step reconciles the same value.
         transform.position = new Vector3(s.Position.x, s.Position.y, transform.position.z);
         transform.rotation = Quaternion.Euler(0f, 0f, s.Rotation);
     }
