@@ -30,7 +30,9 @@ public sealed class PushableObstacle : MonoBehaviour, IPushable, ITickable
     {
         _rb = GetComponent<Rigidbody2D>();
         _rb.mass = Mathf.Max(0.01f, mass);          // guard: never 0 (a 0/negative mass NaNs the drive divisor)
-        _rb.freezeRotation = true;
+        // Start HELD: X frozen so the physics solver can't shove it (a character walking into it just
+        // stops, like a wall). Y stays free (gravity → rests on ground). Tick toggles X free/frozen.
+        _rb.constraints = RigidbodyConstraints2D.FreezeRotation | RigidbodyConstraints2D.FreezePositionX;
         if (_frictionless == null)
             _frictionless = new PhysicsMaterial2D("PushableFrictionless") { friction = 0f, bounciness = 0f };
         if (TryGetComponent<Collider2D>(out var col)) col.sharedMaterial = _frictionless;
@@ -55,22 +57,26 @@ public sealed class PushableObstacle : MonoBehaviour, IPushable, ITickable
         float m = Mathf.Max(0.01f, mass);
         float vx = _rb.linearVelocity.x;
         float netX = _netPush.x;
-        const float eps = 0.02f;
+        const float eps = 0.05f;
 
-        if (Mathf.Abs(vx) < eps && Mathf.Abs(netX) < staticThreshold)
+        // X-free means we're currently engaged (gliding); the constraint itself is the latch.
+        bool xFree = (_rb.constraints & RigidbodyConstraints2D.FreezePositionX) == 0;
+        // Break from rest only when the deliberate push meets the threshold; stay engaged while still
+        // gliding under any push. Below that → held (X frozen, solver can't budge it → N pushers needed).
+        bool engaged = Mathf.Abs(netX) >= staticThreshold || (xFree && Mathf.Abs(vx) > eps);
+
+        if (engaged)
         {
-            // Held: not enough deliberate push to break static friction, and no momentum.
-            _rb.linearVelocity = new Vector2(0f, _rb.linearVelocity.y);
+            _rb.constraints = RigidbodyConstraints2D.FreezeRotation;   // X free → glide
+            vx += (netX / m) * dt;                                     // pusher drive
+            vx *= Mathf.Max(0f, 1f - pushResistance * dt);             // kinetic drag (clamped stable)
+            _rb.linearVelocity = new Vector2(vx, _rb.linearVelocity.y);
         }
         else
         {
-            // Engaged (≥ threshold) OR already moving (sustained push, or a bonk the solver injected).
-            // Pusher force drives; a velocity-proportional drag gives a terminal glide and bleeds a
-            // bonk's momentum. Drag is clamped to [0,1) so a large pushResistance·dt stops it cleanly
-            // instead of flipping the sign (explicit-Euler blow-up).
-            vx += (netX / m) * dt;
-            vx *= Mathf.Max(0f, 1f - pushResistance * dt);
-            _rb.linearVelocity = new Vector2(vx, _rb.linearVelocity.y);
+            // Held: freeze X so a character pressing into it (solver) can't move it below threshold.
+            _rb.linearVelocity = new Vector2(0f, _rb.linearVelocity.y);
+            _rb.constraints = RigidbodyConstraints2D.FreezeRotation | RigidbodyConstraints2D.FreezePositionX;
         }
         _netPush = Vector2.zero;
     }
