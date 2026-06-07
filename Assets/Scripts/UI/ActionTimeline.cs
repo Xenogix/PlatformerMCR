@@ -1,15 +1,8 @@
 using System.Collections.Generic;
+using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
 
-// Bottom-of-screen timeline of recorded actions, one lane per character (P1 + clones), with a
-// shared playhead marking the scrub position — think Super Time Force. The RewindDirector drives
-// it: add a lane per clone, colour each lane's life window, and move the playhead. A translucent
-// "future" overlay dims everything to the right of the playhead (the states you'd leave behind).
-//
-// Sizing is layout-driven: lanesContainer uses a VerticalLayoutGroup + ContentSizeFitter so the
-// stack grows with the clones; the playhead and the future overlay are vertically-stretched
-// children of it (LayoutElement: Ignore Layout), so they always match the stack height.
 public class ActionTimeline : MonoBehaviour
 {
     [Tooltip("Container holding the lane rows (VerticalLayoutGroup + ContentSizeFitter).")]
@@ -27,6 +20,9 @@ public class ActionTimeline : MonoBehaviour
     [Tooltip("Colour of the translucent overlay that dims the 'future' (everything to the right of " +
              "the playhead — the states you'd discard/replay if you confirmed here).")]
     [SerializeField] private Color futureMaskColor = new(0f, 0f, 0f, 0.55f);
+    [Tooltip("Hint line shown inside the timeline; its key tokens are filled in at runtime by the " +
+             "RewindDirector from the actual bindings (so it stays correct if controls are rebound).")]
+    [SerializeField] private TMP_Text hintLabel;
 
     private readonly List<LaneView> _lanes = new();
     private RectTransform _futureMask; // dims [playhead .. right edge]; built at runtime
@@ -116,6 +112,12 @@ public class ActionTimeline : MonoBehaviour
             _futureMask.offsetMin = Vector2.zero;
             _futureMask.offsetMax = Vector2.zero;
         }
+    }
+
+    // Sets the runtime-resolved control legend shown inside the timeline (see hintLabel).
+    public void SetHint(string text)
+    {
+        if (hintLabel != null) hintLabel.text = text;
     }
 
     // Show/hide the whole timeline via a CanvasGroup (keeps the GameObject active).
