@@ -4,8 +4,13 @@ using UnityEngine;
 public class Player : Entity
 {
     private PlayerController controller;
+    private InteractionDetector interactor;
 
-    private void Awake() => controller = GetComponent<PlayerController>();
+    private void Awake()
+    {
+        controller = GetComponent<PlayerController>();
+        interactor = GetComponent<InteractionDetector>();
+    }
 
     // Command-receiver facade: bene's retargetable commands call these on whichever
     // Player they're handed — the live one while playing, a clone during replay.
@@ -13,8 +18,7 @@ public class Player : Entity
     public void Jump() => controller.RequestJump();
     public void SetJumpHeld(bool held) => controller.SetJumpHeld(held);
 
-    // TODO: usable/lever interaction (deferred with the StateChannel work). UseCommand
-    // resolves the target from the player's OWN position, so a replaying clone will
-    // flip whatever it's standing next to for free once this is implemented.
-    public void Use() { }
+    // Activate the nearest interactable to THIS body's position (a lever/button). UseCommand calls
+    // this, so a replaying clone flips whatever its replayed position puts it next to — for free.
+    public void Use() => interactor?.GetClosest()?.Interact();
 }
