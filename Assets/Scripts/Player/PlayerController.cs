@@ -49,6 +49,8 @@ public class PlayerController : MonoBehaviour
     private Vector2 prevBaseVelocity;   // last tick's baseVelocity — measure our own speed against this so a carrier's OWN
                                         // acceleration isn't absorbed into the resistance (snappy carry)
     private float wallDirX;             // -1/+1: horizontal dir of a blocking steep STATIC wall this tick (0 = none)
+    private Vector2 lastGroundVelocity; // groundVelocity from the last grounded tick — the coyote-jump carrier boost source
+    private bool baseSeeded;            // false until prevBaseVelocity holds a real base (avoids a spawn de-pollution spike)
 
     private float gravity; // units/s², cached from gravityScale × Physics2D.gravity in Awake
 
@@ -128,7 +130,11 @@ public class PlayerController : MonoBehaviour
         _groundFilter.SetLayerMask(groundLayer);
     }
 
-    private void OnEnable() => _characters.Add(this);
+    private void OnEnable()
+    {
+        _characters.Add(this);
+        baseSeeded = false; // re-seed prevBaseVelocity on the first tick (avoids a spawn-on-moving-carrier velocity spike)
+    }
 
     private void OnDisable()
     {
@@ -163,12 +169,13 @@ public class PlayerController : MonoBehaviour
         ResolveCharacterOverlaps(); // toggle ignore for deep overlaps BEFORE the solver steps this tick
 
         IsOnGround = CheckGround();
-        if (IsOnGround) lastGroundedTick = currentTick;     // coyote-time window
+        if (IsOnGround) { lastGroundedTick = currentTick; lastGroundVelocity = groundVelocity; } // coyote window + jump-boost source
         // Coupling frame for this tick: the surface we ride (groundVelocity) plus the horizontal push
-        // from bodies pressing into our sides. ScanContacts also flags a blocking wall and exerts
-        // pushForce on any IPushable we lean into.
+        // from bodies pressing into our sides. ScanContacts also flags a blocking wall.
         baseVelocity = groundVelocity + ScanContacts();
-        if (rewound) prevBaseVelocity = baseVelocity;       // after a rewind, don't de-pollute against a pre-rewind base
+        // Seed prevBaseVelocity on the first tick / after a rewind so de-pollution isn't measured against
+        // a stale-or-zero base (which would spike a body spawned or restored onto a moving carrier).
+        if (rewound || !baseSeeded) { prevBaseVelocity = baseVelocity; baseSeeded = true; }
 
         // Set the velocity the solver integrates this tick. It then resolves all contacts: walls,
         // ceilings, de-penetration, and keeping a stack of characters from interpenetrating.
@@ -256,7 +263,7 @@ public class PlayerController : MonoBehaviour
                       && currentTick - lastGroundedTick <= coyoteTicks;
         if (buffered && (IsOnGround || coyote))
         {
-            velocity.y = jumpForce + Mathf.Max(0f, groundVelocity.y); // inherit an upward carrier's boost
+            velocity.y = jumpForce + Mathf.Max(0f, lastGroundVelocity.y); // inherit an upward carrier's boost (last grounded → coyote keeps it)
             lastJumpPressTick = int.MinValue; // consume the buffered press
             lastJumpedTick = currentTick;     // start the post-jump ground-suppress window
             lastGroundedTick = int.MinValue;  // consume coyote so we can't re-jump in mid-air
@@ -325,7 +332,9 @@ public class PlayerController : MonoBehaviour
             if (otherRb != null)
             {
                 float into = Vector2.Dot(otherRb.linearVelocity, nrm); // its speed heading INTO us
-                if (into > 0f) sidePush.x += nrm.x * into;             // inherit the horizontal part only
+                // Inherit the horizontal part only, capped at moveSpeed so a fast/heavy body shoving our
+                // side can't inject unbounded velocity and launch us. (Carry via groundVelocity is uncapped.)
+                if (into > 0f) sidePush.x += nrm.x * Mathf.Min(into, moveSpeed);
             }
         }
         return sidePush;
@@ -336,7 +345,13 @@ public class PlayerController : MonoBehaviour
     private Vector2 ClampAgainstWalls(Vector2 velocity)
     {
         if (wallDirX != 0f && Mathf.Sign(velocity.x) == wallDirX && Mathf.Abs(velocity.x) > 0.0001f)
+        {
             velocity.x = 0f;
+            // On a walkable slope the slope-tangent also gave a vertical component, which would creep us
+            // up the wall while grounded. Drop it back to the carrier's own vertical. Runs AFTER TryJump
+            // (which sets IsOnGround=false), so a jump's velocity.y is preserved.
+            if (IsOnGround) velocity.y = baseVelocity.y;
+        }
         return velocity;
     }
 
