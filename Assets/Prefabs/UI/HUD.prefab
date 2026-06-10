@@ -1358,6 +1358,11 @@ PrefabInstance:
       propertyPath: m_LocalEulerAnglesHint.z
       value: 0
       objectReference: {fileID: 0}
+    - target: {fileID: 8374462084879178530, guid: 7fbdef9991ce54044877a659cd8f634f, type: 3}
+      propertyPath: gameplayHint
+      value: "<b>\u25C4 \u25BA</b> : Move      <b>Space</b> : Jump      <b>Tab</b>
+        : Timeline      <b>E</b> : Interact"
+      objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
     m_AddedGameObjects: []
