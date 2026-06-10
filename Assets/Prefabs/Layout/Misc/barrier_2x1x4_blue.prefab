@@ -68,6 +68,9 @@ PrefabInstance:
     - targetCorrespondingSourceObject: {fileID: 919132149155446097, guid: 1e4d1cc002f21da41a0ade959bafb28d, type: 3}
       insertIndex: -1
       addedObject: {fileID: 832700546087339705}
+    - targetCorrespondingSourceObject: {fileID: 919132149155446097, guid: 1e4d1cc002f21da41a0ade959bafb28d, type: 3}
+      insertIndex: -1
+      addedObject: {fileID: 8159427360514283906}
   m_SourcePrefab: {fileID: 100100000, guid: 1e4d1cc002f21da41a0ade959bafb28d, type: 3}
 --- !u!1 &4735485804720175149 stripped
 GameObject:
@@ -161,3 +164,15 @@ BoxCollider2D:
   m_AutoTiling: 0
   m_Size: {x: 2.000001, y: 4}
   m_EdgeRadius: 0
+--- !u!114 &8159427360514283906
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 4735485804720175149}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: ea79afe99ab07406aa849a1f90b14a6e, type: 3}
+  m_Name:
+  m_EditorClassIdentifier: Assembly-CSharp::RewindableEntity
