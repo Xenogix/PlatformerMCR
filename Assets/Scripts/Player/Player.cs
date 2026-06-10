@@ -20,5 +20,11 @@ public class Player : Entity
 
     // Activate the nearest interactable to THIS body's position (a lever/button). UseCommand calls
     // this, so a replaying clone flips whatever its replayed position puts it next to — for free.
-    public void Use() => interactor?.GetClosest()?.Interact();
+    // An interactable always wins; with none in range, Use shoves nearby characters instead.
+    public void Use()
+    {
+        IInteractable closest = interactor?.GetClosest();
+        if (closest != null) closest.Interact();
+        else controller.ShoveNearby();
+    }
 }

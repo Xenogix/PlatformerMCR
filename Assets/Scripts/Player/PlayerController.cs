@@ -23,6 +23,14 @@ public class PlayerController : MonoBehaviour
     [SerializeField] private float lowJumpGravityMultiplier = 3f;
     [SerializeField] private float fallGravityMultiplier = 2.5f;
 
+    [Header("Shove")]
+    [Tooltip("Use with no interactable in range shoves other characters within this radius (center-to-center).")]
+    [SerializeField] private float shoveRadius = 1.5f;
+    [Tooltip("Velocity set on each shoved character, away from the shover's center.")]
+    [SerializeField] private float shoveSpeed = 12f;
+    [Tooltip("Velocity set on the shover, opposite the summed shove direction (the rebound).")]
+    [SerializeField] private float recoilSpeed = 8f;
+
     [Header("Ground check")]
     [Tooltip("Layers considered solid for the ground check. ~0 (Everything) works — standing on another character is valid ground (you ride it).")]
     [SerializeField] private LayerMask groundLayer = ~0;
@@ -156,6 +164,31 @@ public class PlayerController : MonoBehaviour
         jumpHeld = held;
         // Releasing cancels a pending buffered jump, so a tap doesn't fire a late jump.
         if (!held) { jumpRequested = false; lastJumpPressTick = int.MinValue; }
+    }
+
+    // Use with no interactable in range: shove every other character within shoveRadius away from us
+    // (center-to-center) and rebound in the summed opposite direction. Plain velocity SETS, like the
+    // jump: ApplyHorizontal's re-target is the natural decay, and RigidbodyChannel already records
+    // the result — no extra rewindable state needed.
+    public void ShoveNearby()
+    {
+        Vector2 center = col.bounds.center;
+        Vector2 recoil = Vector2.zero;
+        foreach (PlayerController other in _characters)
+        {
+            if (other == this) continue;
+            Vector2 toOther = (Vector2)other.col.bounds.center - center;
+            float dist = toOther.magnitude;
+            if (dist > shoveRadius) continue;
+            // Coincident centers (spawned/rewound into each other): push up, deterministically — no
+            // randomness, so a clone replaying this UseCommand reproduces the same shove.
+            Vector2 dir = dist > 1e-4f ? toOther / dist : Vector2.up;
+            other.rb.linearVelocity = dir * shoveSpeed;
+            recoil -= dir;
+        }
+        // Targets on both sides cancel out (recoil ≈ zero) — then the shover stays put.
+        if (recoil.sqrMagnitude > 1e-6f)
+            rb.linearVelocity = recoil.normalized * recoilSpeed;
     }
 
     public void Tick(int tick, float dt)
