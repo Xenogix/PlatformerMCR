@@ -58,6 +58,10 @@ public class GameClock : MonoBehaviour
     /// home for the seconds→ticks rule used by jump buffers, rewind offsets, and windows.</summary>
     public static int SecondsToTicks(float seconds) => Mathf.Max(1, Mathf.RoundToInt(seconds / Time.fixedDeltaTime));
 
+    /// <summary>Fixed ticks per second — the inverse of <see cref="SecondsToTicks"/>, for
+    /// tick→time displays. Lives here so the conversion rule has a single home.</summary>
+    public static int TicksPerSecond => Mathf.Max(1, Mathf.RoundToInt(1f / Time.fixedDeltaTime));
+
     // Movers tick bottom-up (sorted by world Y): a carrier ticks before the rider standing on it, so
     // the rider reads the carrier's FRESH velocity this tick (a jump included) and matches it — instead
     // of the dynamic solver splitting the jump's momentum between the two stacked bodies.
