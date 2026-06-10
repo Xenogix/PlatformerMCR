@@ -15,6 +15,8 @@ public class PlayerController : MonoBehaviour
     [SerializeField] private float jumpForce = 12f;
     [Tooltip("How long a jump press is buffered before landing, in seconds (converted to fixed ticks in Awake).")]
     [SerializeField] private float jumpBufferTime = 0.1f;
+    [Tooltip("Grace period after leaving the ground during which a jump still fires (coyote time), in seconds.")]
+    [SerializeField] private float coyoteTime = 0.1f;
     [Tooltip("Gravity multiplier while ascending with jump held. >1 caps the jump height even when held; ~1.5 gives a generous held jump.")]
     [SerializeField] private float ascentGravityMultiplier = 1.5f;
     [Tooltip("Gravity multiplier while ascending after jump was released (cuts the jump short).")]
@@ -42,7 +44,13 @@ public class PlayerController : MonoBehaviour
 
     // Ground state for the current tick, set by CheckGround().
     private Vector2 groundNormal = Vector2.up;
-    private Vector2 groundVelocity; // velocity of the body we stand on (a moving platform / carrier), else zero
+    private Vector2 groundVelocity;     // velocity of the body we stand on (a moving platform / carrier), else zero
+    private Vector2 baseVelocity;       // the carry frame: groundVelocity (support) + horizontal side-push from bodies pressing into us
+    private Vector2 prevBaseVelocity;   // last tick's baseVelocity — measure our own speed against this so a carrier's OWN
+                                        // acceleration isn't absorbed into the resistance (snappy carry)
+    private float wallDirX;             // -1/+1: horizontal dir of a blocking steep STATIC wall this tick (0 = none)
+    private Vector2 lastGroundVelocity; // groundVelocity from the last grounded tick — the coyote-jump carrier boost source
+    private bool baseSeeded;            // false until prevBaseVelocity holds a real base (avoids a spawn de-pollution spike)
 
     private float gravity; // units/s², cached from gravityScale × Physics2D.gravity in Awake
 
@@ -59,12 +67,14 @@ public class PlayerController : MonoBehaviour
     private const float PostJumpGroundedSuppressSeconds = 0.1f;
     private int jumpBufferTicks;
     private int groundSuppressTicks;
+    private int coyoteTicks;
 
     // Stored as absolute tick STAMPS compared against the current tick — rewind-safe with no extra
     // channel: after a rewind the current tick moves back while a stamp stays in the future, so the
     // "happened recently" window fails (no phantom jump). A backward tick also clears them.
     private int lastJumpPressTick = int.MinValue;
     private int lastJumpedTick = int.MinValue;
+    private int lastGroundedTick = int.MinValue; // last grounded tick — the coyote-time window
     private bool jumpRequested;
     private int currentTick;
 
@@ -80,6 +90,8 @@ public class PlayerController : MonoBehaviour
     // Reusable ground-check buffer. A List (not a fixed array) so it grows to hold every hit instead
     // of silently truncating. Shared statically: queries run on the main thread, consumed synchronously.
     private static readonly List<RaycastHit2D> _groundHits = new();
+    private static readonly List<ContactPoint2D> _contacts = new(); // reused per-tick contact scan for pushing
+    private static readonly HashSet<Collider2D> _scannedBodies = new(); // a box-box contact has 2 points; count each body once
     private ContactFilter2D _groundFilter; // non-trigger, groundLayer
 
     // One frictionless material shared by all characters: with per-tick velocity control, contact
@@ -108,6 +120,7 @@ public class PlayerController : MonoBehaviour
         gravity = Mathf.Abs(Physics2D.gravity.y) * gravityScale;
         jumpBufferTicks = GameClock.SecondsToTicks(jumpBufferTime);
         groundSuppressTicks = GameClock.SecondsToTicks(PostJumpGroundedSuppressSeconds);
+        coyoteTicks = GameClock.SecondsToTicks(coyoteTime);
         // Deep = overlapping by more than a quarter body: a spawn/rewind injection, never a solver
         // contact (which the dynamic solver keeps below the skin). Kept above the clear skin so the
         // hysteresis band is valid.
@@ -117,7 +130,11 @@ public class PlayerController : MonoBehaviour
         _groundFilter.SetLayerMask(groundLayer);
     }
 
-    private void OnEnable() => _characters.Add(this);
+    private void OnEnable()
+    {
+        _characters.Add(this);
+        baseSeeded = false; // re-seed prevBaseVelocity on the first tick (avoids a spawn-on-moving-carrier velocity spike)
+    }
 
     private void OnDisable()
     {
@@ -143,14 +160,22 @@ public class PlayerController : MonoBehaviour
 
     public void Tick(int tick, float dt)
     {
-        // A backward tick means the clock was rewound — drop stale jump/suppress stamps.
-        if (tick < currentTick) { lastJumpPressTick = int.MinValue; lastJumpedTick = int.MinValue; }
+        // A backward tick means the clock was rewound — drop stale jump/suppress/coyote stamps.
+        bool rewound = tick < currentTick;
+        if (rewound) { lastJumpPressTick = int.MinValue; lastJumpedTick = int.MinValue; lastGroundedTick = int.MinValue; }
         currentTick = tick;
         if (jumpRequested) { lastJumpPressTick = tick; jumpRequested = false; }
 
         ResolveCharacterOverlaps(); // toggle ignore for deep overlaps BEFORE the solver steps this tick
 
         IsOnGround = CheckGround();
+        if (IsOnGround) { lastGroundedTick = currentTick; lastGroundVelocity = groundVelocity; } // coyote window + jump-boost source
+        // Coupling frame for this tick: the surface we ride (groundVelocity) plus the horizontal push
+        // from bodies pressing into our sides. ScanContacts also flags a blocking wall.
+        baseVelocity = groundVelocity + ScanContacts();
+        // Seed prevBaseVelocity on the first tick / after a rewind so de-pollution isn't measured against
+        // a stale-or-zero base (which would spike a body spawned or restored onto a moving carrier).
+        if (rewound || !baseSeeded) { prevBaseVelocity = baseVelocity; baseSeeded = true; }
 
         // Set the velocity the solver integrates this tick. It then resolves all contacts: walls,
         // ceilings, de-penetration, and keeping a stack of characters from interpenetrating.
@@ -158,8 +183,10 @@ public class PlayerController : MonoBehaviour
         velocity = ApplyHorizontal(velocity, dt);
         velocity = ApplyGravity(velocity, dt);
         velocity = TryJump(velocity);
+        velocity = ClampAgainstWalls(velocity); // cancel into-wall x so a frictionless steep slope can't slide us up (jitter)
         rb.linearVelocity = velocity;
 
+        prevBaseVelocity = baseVelocity;     // remember for next tick's carry de-pollution
         FireLandEvent();
     }
 
@@ -202,10 +229,13 @@ public class PlayerController : MonoBehaviour
             // target is the carrier's own speed, so we're carried on both axes; on static ground it's
             // zero. The tangent follows the surface so we walk up/down slopes without sliding.
             Vector2 tangent = new(groundNormal.y, -groundNormal.x);
-            float relCurrent = Vector2.Dot(velocity - groundVelocity, tangent);
+            // Measure our own speed against LAST tick's base velocity, not this tick's, so a carrier
+            // that is itself accelerating isn't absorbed into the resistance → we track it rigidly
+            // (snappy carry) instead of friction-lagging up to its speed. Add the CURRENT base vel back.
+            float relCurrent = Vector2.Dot(velocity - prevBaseVelocity, tangent);
             float relTarget = direction.x * moveSpeed;
             float relNew = Mathf.MoveTowards(relCurrent, relTarget, rate * dt);
-            return groundVelocity + tangent * relNew;
+            return baseVelocity + tangent * relNew;
         }
 
         // Airborne: air-control the horizontal, preserve vertical for the jump/fall arc.
@@ -228,11 +258,15 @@ public class PlayerController : MonoBehaviour
     {
         bool buffered = lastJumpPressTick != int.MinValue && currentTick >= lastJumpPressTick
                         && currentTick - lastJumpPressTick <= jumpBufferTicks;
-        if (buffered && IsOnGround)
+        // Coyote time: still jumpable for a short window after leaving the ground.
+        bool coyote = lastGroundedTick != int.MinValue && currentTick >= lastGroundedTick
+                      && currentTick - lastGroundedTick <= coyoteTicks;
+        if (buffered && (IsOnGround || coyote))
         {
-            velocity.y = jumpForce + Mathf.Max(0f, groundVelocity.y); // inherit an upward carrier's boost
+            velocity.y = jumpForce + Mathf.Max(0f, lastGroundVelocity.y); // inherit an upward carrier's boost (last grounded → coyote keeps it)
             lastJumpPressTick = int.MinValue; // consume the buffered press
             lastJumpedTick = currentTick;     // start the post-jump ground-suppress window
+            lastGroundedTick = int.MinValue;  // consume coyote so we can't re-jump in mid-air
             IsOnGround = false;
             OnJumped?.Invoke();
         }
@@ -259,6 +293,66 @@ public class PlayerController : MonoBehaviour
             else if (ignored && depth > -OverlapClearSkin)
                 Physics2D.IgnoreCollision(col, other.col, false);  // nearly clear → solid again
         }
+    }
+
+    // One pass over our side contacts (horizontal-dominant normals), doing two things:
+    //   1. wall-stop: flag a steep STATIC surface we're pushing into (a slope too steep to walk, or a
+    //      wall) so ClampAgainstWalls can cancel the into-wall velocity — otherwise the frictionless
+    //      body slides up the diagonal normal and jitters off the ground.
+    //   2. side-push: inherit the HORIZONTAL component of a body moving into us (an idle clone gets
+    //      shoved; opposing pushers cancel → head-on void). Horizontal only, so it never pollutes
+    //      jump height. Returned to fold into baseVelocity.
+    private Vector2 ScanContacts()
+    {
+        wallDirX = 0f;
+        Vector2 sidePush = Vector2.zero;
+        if (col == null) return sidePush;
+        _scannedBodies.Clear();
+
+        Vector2 myCenter = rb.worldCenterOfMass;
+        int n = rb.GetContacts(_contacts);
+        for (int i = 0; i < n; i++)
+        {
+            ContactPoint2D cp = _contacts[i];
+            Collider2D otherCol = (cp.collider != null && cp.collider.attachedRigidbody == rb) ? cp.otherCollider : cp.collider;
+            if (otherCol == null || otherCol.transform.IsChildOf(transform)) continue;
+            if (!_scannedBodies.Add(otherCol)) continue; // one push/side-push per body, not per contact point
+            Rigidbody2D otherRb = otherCol.attachedRigidbody;
+
+            // Orient the contact normal to point INTO us, independent of Unity's convention.
+            Vector2 otherCenter = otherRb != null ? otherRb.worldCenterOfMass : (Vector2)cp.point;
+            Vector2 nrm = cp.normal;
+            if (Vector2.Dot(nrm, myCenter - otherCenter) < 0f) nrm = -nrm;
+            if (Mathf.Abs(nrm.x) <= Mathf.Abs(nrm.y)) continue; // side contacts only (support/ceiling handled elsewhere)
+
+            bool isStatic = otherRb == null || otherRb.bodyType == RigidbodyType2D.Static;
+            if (isStatic && Vector2.Angle(nrm, Vector2.up) > maxSlopeAngle)
+                wallDirX = Mathf.Sign(-nrm.x); // a steep static surface in front of us → block it
+
+            if (otherRb != null)
+            {
+                float into = Vector2.Dot(otherRb.linearVelocity, nrm); // its speed heading INTO us
+                // Inherit the horizontal part only, capped at moveSpeed so a fast/heavy body shoving our
+                // side can't inject unbounded velocity and launch us. (Carry via groundVelocity is uncapped.)
+                if (into > 0f) sidePush.x += nrm.x * Mathf.Min(into, moveSpeed);
+            }
+        }
+        return sidePush;
+    }
+
+    // Cancel horizontal velocity heading into a steep static wall (flagged in ScanContacts). Vertical
+    // velocity is untouched, so falling and wall-jumps still work.
+    private Vector2 ClampAgainstWalls(Vector2 velocity)
+    {
+        if (wallDirX != 0f && Mathf.Sign(velocity.x) == wallDirX && Mathf.Abs(velocity.x) > 0.0001f)
+        {
+            velocity.x = 0f;
+            // On a walkable slope the slope-tangent also gave a vertical component, which would creep us
+            // up the wall while grounded. Drop it back to the carrier's own vertical. Runs AFTER TryJump
+            // (which sets IsOnGround=false), so a jump's velocity.y is preserved.
+            if (IsOnGround) velocity.y = baseVelocity.y;
+        }
+        return velocity;
     }
 
     private void FireLandEvent()

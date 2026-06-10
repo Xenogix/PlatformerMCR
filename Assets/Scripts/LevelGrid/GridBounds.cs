@@ -15,6 +15,13 @@ public class GridBounds : MonoBehaviour
     private void OnEnable()
     {
         UpdateRefs();
+        // _grid is guaranteed by [RequireComponent]; the real NRE risk is _box, which Refresh()
+        // dereferences (GetComponentInChildren returns null if there's no BoxCollider2D anywhere).
+        if (_box == null)
+        {
+            Debug.LogError("BoxCollider2D not found on " + gameObject.name + " or its children.", this);
+            return;
+        }
         _grid.FieldChanged += Refresh;
         Refresh();
     }
