@@ -16,7 +16,8 @@ public class InteractionDetector : MonoBehaviour
 
     public IInteractable GetClosest()
     {
-        var filter = new ContactFilter2D { useLayerMask = true, layerMask = interactableLayer };
+        // useTriggers: interactables expose trigger colliders (a solid one would block movement).
+        var filter = new ContactFilter2D { useTriggers = true, useLayerMask = true, layerMask = interactableLayer };
         int count = Physics2D.OverlapCircle(transform.position, interactRadius, filter, _hits);
 
         IInteractable closest = null;
