@@ -84,6 +84,12 @@ public class PlayerController : MonoBehaviour
     private int lastJumpPressTick = int.MinValue;
     private int lastJumpedTick = int.MinValue;
     private int lastGroundedTick = int.MinValue; // last grounded tick — the coyote-time window
+    private int lastShovedTick = int.MinValue;   // upward shove launch — shares the jump's ground-suppress window
+
+    // Shove queued by a character's Use (ours or another's), consumed in OUR next Tick. Within-tick
+    // transient: queued during command execution, eaten by the pipeline at most one tick later, so it
+    // needs no rewind channel. Two shovers in one tick: last one wins, same as the velocity-set idiom.
+    private Vector2 pendingShove;
     private bool jumpRequested;
     private int currentTick;
 
@@ -168,9 +174,10 @@ public class PlayerController : MonoBehaviour
     }
 
     // Use with no interactable in range: shove every other character within shoveRadius away from us
-    // (center-to-center) and rebound in the summed opposite direction. Plain velocity SETS, like the
-    // jump: ApplyHorizontal's re-target is the natural decay, and RigidbodyChannel already records
-    // the result — no extra rewindable state needed.
+    // (center-to-center) and rebound in the summed opposite direction. Each shove is QUEUED on its
+    // target and consumed inside that target's own Tick (see ConsumePendingShove) — a direct velocity
+    // write here would be reprocessed or discarded by the target's pipeline depending on mover tick
+    // order (height). The applied result lands in RigidbodyChannel — no extra rewindable state.
     public void ShoveNearby()
     {
         Vector2 center = col.bounds.center;
@@ -184,19 +191,34 @@ public class PlayerController : MonoBehaviour
             // Coincident centers (spawned/rewound into each other): push up, deterministically — no
             // randomness, so a clone replaying this UseCommand reproduces the same shove.
             Vector2 dir = dist > NearZero ? toOther / dist : Vector2.up;
-            other.rb.linearVelocity = dir * shoveSpeed;
+            other.pendingShove = dir * shoveSpeed;
             recoil -= dir;
         }
-        // Targets on both sides cancel out (recoil ≈ zero) — then the shover stays put.
+        // Targets on both sides cancel out (recoil ≈ zero) — then the shover stays put. Our own Tick
+        // runs right after this command, so the recoil is consumed this very tick.
         if (recoil.sqrMagnitude > NearZero * NearZero)
-            rb.linearVelocity = recoil.normalized * recoilSpeed;
+            pendingShove = recoil.normalized * recoilSpeed;
+    }
+
+    // Eat a queued shove INSIDE our own tick: applied after ApplyHorizontal/TryJump so the grounded
+    // branch's ground-frame reconstruction can't discard the vertical part, and the outcome no longer
+    // depends on whether we tick before or after the shover. Runs before ClampAgainstWalls so a shove
+    // still can't drive us into a wall. Upward launches borrow the jump's ground-suppress so the next
+    // ticks' grounded branch can't re-pin them away.
+    private Vector2 ConsumePendingShove(Vector2 velocity)
+    {
+        if (pendingShove == Vector2.zero) return velocity;
+        velocity = pendingShove;
+        if (pendingShove.y > 0f) { lastShovedTick = currentTick; IsOnGround = false; }
+        pendingShove = Vector2.zero;
+        return velocity;
     }
 
     public void Tick(int tick, float dt)
     {
         // A backward tick means the clock was rewound — drop stale jump/suppress/coyote stamps.
         bool rewound = tick < currentTick;
-        if (rewound) { lastJumpPressTick = int.MinValue; lastJumpedTick = int.MinValue; lastGroundedTick = int.MinValue; }
+        if (rewound) { lastJumpPressTick = int.MinValue; lastJumpedTick = int.MinValue; lastGroundedTick = int.MinValue; lastShovedTick = int.MinValue; pendingShove = Vector2.zero; }
         currentTick = tick;
         if (jumpRequested) { lastJumpPressTick = tick; jumpRequested = false; }
 
@@ -217,6 +239,7 @@ public class PlayerController : MonoBehaviour
         velocity = ApplyHorizontal(velocity, dt);
         velocity = ApplyGravity(velocity, dt);
         velocity = TryJump(velocity);
+        velocity = ConsumePendingShove(velocity);
         velocity = ClampAgainstWalls(velocity); // cancel into-wall x so a frictionless steep slope can't slide us up (jitter)
         rb.linearVelocity = velocity;
 
@@ -231,9 +254,10 @@ public class PlayerController : MonoBehaviour
         groundNormal = Vector2.up;
         groundVelocity = Vector2.zero;
         if (col == null) return false;
-        // Suppress grounding briefly right after a jump so we don't immediately re-pin to the floor.
-        if (lastJumpedTick != int.MinValue && currentTick >= lastJumpedTick
-            && currentTick - lastJumpedTick < groundSuppressTicks) return false;
+        // Suppress grounding briefly right after a jump or an upward shove so we don't immediately re-pin to the floor.
+        int lastLaunchTick = Mathf.Max(lastJumpedTick, lastShovedTick);
+        if (lastLaunchTick != int.MinValue && currentTick >= lastLaunchTick
+            && currentTick - lastLaunchTick < groundSuppressTicks) return false;
 
         Bounds b = col.bounds;
         Vector2 origin = new(b.center.x, b.min.y + 0.01f);
