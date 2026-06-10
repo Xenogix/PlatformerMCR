@@ -88,7 +88,7 @@ public class PlayerController : MonoBehaviour
 
     // Shove queued by a character's Use (ours or another's), consumed in OUR next Tick. Within-tick
     // transient: queued during command execution, eaten by the pipeline at most one tick later, so it
-    // needs no rewind channel. Two shovers in one tick: last one wins, same as the velocity-set idiom.
+    // needs no rewind channel. Multiple shovers in one tick accumulate, matching the additive apply.
     private Vector2 pendingShove;
     private bool jumpRequested;
     private int currentTick;
@@ -191,24 +191,25 @@ public class PlayerController : MonoBehaviour
             // Coincident centers (spawned/rewound into each other): push up, deterministically — no
             // randomness, so a clone replaying this UseCommand reproduces the same shove.
             Vector2 dir = dist > NearZero ? toOther / dist : Vector2.up;
-            other.pendingShove = dir * shoveSpeed;
+            other.pendingShove += dir * shoveSpeed;
             recoil -= dir;
         }
         // Targets on both sides cancel out (recoil ≈ zero) — then the shover stays put. Our own Tick
         // runs right after this command, so the recoil is consumed this very tick.
         if (recoil.sqrMagnitude > NearZero * NearZero)
-            pendingShove = recoil.normalized * recoilSpeed;
+            pendingShove += recoil.normalized * recoilSpeed;
     }
 
     // Eat a queued shove INSIDE our own tick: applied after ApplyHorizontal/TryJump so the grounded
     // branch's ground-frame reconstruction can't discard the vertical part, and the outcome no longer
     // depends on whether we tick before or after the shover. Runs before ClampAgainstWalls so a shove
-    // still can't drive us into a wall. Upward launches borrow the jump's ground-suppress so the next
-    // ticks' grounded branch can't re-pin them away.
+    // still can't drive us into a wall. ADDITIVE, so it composes with the receiver's own motion: a
+    // same-tick jump stacks into a higher launch, and a recoil against the jump's x trims it. Upward
+    // shoves borrow the jump's ground-suppress so the next ticks' grounded branch can't re-pin them.
     private Vector2 ConsumePendingShove(Vector2 velocity)
     {
         if (pendingShove == Vector2.zero) return velocity;
-        velocity = pendingShove;
+        velocity += pendingShove;
         if (pendingShove.y > 0f) { lastShovedTick = currentTick; IsOnGround = false; }
         pendingShove = Vector2.zero;
         return velocity;
