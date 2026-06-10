@@ -24,7 +24,7 @@ public class PlayerController : MonoBehaviour
     [SerializeField] private float fallGravityMultiplier = 2.5f;
 
     [Header("Shove")]
-    [Tooltip("Use with no interactable in range shoves other characters within this radius (center-to-center).")]
+    [Tooltip("Use with no interactable in range shoves other characters within this radius (center-to-center). Pairs with InteractionDetector.interactRadius — Use's interact reach; tune both to keep one coherent Use range.")]
     [SerializeField] private float shoveRadius = 1.5f;
     [Tooltip("Velocity set on each shoved character, away from the shover's center.")]
     [SerializeField] private float shoveSpeed = 12f;
@@ -69,6 +69,7 @@ public class PlayerController : MonoBehaviour
     private static readonly List<PlayerController> _characters = new();
     private float overlapIgnoreDepth;            // penetration past which we ignore the pair (set in Awake)
     private const float OverlapClearSkin = 0.05f; // penetration under which we re-solidify the pair
+    private const float NearZero = 1e-4f;         // shared "effectively zero" threshold (degenerate shove dir, cancelled recoil, wall-clamp)
 
     // Jump buffering / ground-suppress use fixed-tick timing (not Time.time) so they're
     // rewind-safe and replay-stable: a clone replaying the same commands reproduces the same jumps.
@@ -176,18 +177,18 @@ public class PlayerController : MonoBehaviour
         Vector2 recoil = Vector2.zero;
         foreach (PlayerController other in _characters)
         {
-            if (other == this) continue;
+            if (other == this || other == null || other.col == null) continue; // same guards as ResolveCharacterOverlaps
             Vector2 toOther = (Vector2)other.col.bounds.center - center;
             float dist = toOther.magnitude;
             if (dist > shoveRadius) continue;
             // Coincident centers (spawned/rewound into each other): push up, deterministically — no
             // randomness, so a clone replaying this UseCommand reproduces the same shove.
-            Vector2 dir = dist > 1e-4f ? toOther / dist : Vector2.up;
+            Vector2 dir = dist > NearZero ? toOther / dist : Vector2.up;
             other.rb.linearVelocity = dir * shoveSpeed;
             recoil -= dir;
         }
         // Targets on both sides cancel out (recoil ≈ zero) — then the shover stays put.
-        if (recoil.sqrMagnitude > 1e-6f)
+        if (recoil.sqrMagnitude > NearZero * NearZero)
             rb.linearVelocity = recoil.normalized * recoilSpeed;
     }
 
@@ -366,7 +367,8 @@ public class PlayerController : MonoBehaviour
             {
                 float into = Vector2.Dot(otherRb.linearVelocity, nrm); // its speed heading INTO us
                 // Inherit the horizontal part only, capped at moveSpeed so a fast/heavy body shoving our
-                // side can't inject unbounded velocity and launch us. (Carry via groundVelocity is uncapped.)
+                // side can't inject unbounded velocity and launch us. (Carry via groundVelocity and the
+                // deliberate ShoveNearby launch are the uncapped channels.)
                 if (into > 0f) sidePush.x += nrm.x * Mathf.Min(into, moveSpeed);
             }
         }
@@ -377,7 +379,7 @@ public class PlayerController : MonoBehaviour
     // velocity is untouched, so falling and wall-jumps still work.
     private Vector2 ClampAgainstWalls(Vector2 velocity)
     {
-        if (wallDirX != 0f && Mathf.Sign(velocity.x) == wallDirX && Mathf.Abs(velocity.x) > 0.0001f)
+        if (wallDirX != 0f && Mathf.Sign(velocity.x) == wallDirX && Mathf.Abs(velocity.x) > NearZero)
         {
             velocity.x = 0f;
             // On a walkable slope the slope-tangent also gave a vertical component, which would creep us
