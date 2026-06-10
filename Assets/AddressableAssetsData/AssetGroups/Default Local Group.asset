@@ -20,6 +20,11 @@ MonoBehaviour:
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 60bbe68b63aa90247bbb2cb3c0ce9d8f
+    m_Address: Assets/Scenes/Levels/Level05.unity
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: 745dddc10e268c847b0a77b459883283
     m_Address: Assets/Scenes/Levels/Level01.unity
     m_ReadOnly: 0
@@ -32,6 +37,11 @@ MonoBehaviour:
     FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: becc17d987967f4468f83da6c98e09ff
     m_Address: Assets/Scenes/Levels/Level03.unity
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: c3e81da96ec84dd4ebe693dd85aed99d
+    m_Address: Assets/Scenes/Levels/Level04.unity
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0

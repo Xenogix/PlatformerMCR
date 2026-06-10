@@ -47,7 +47,7 @@ public class PlayerCommandInvoker : MonoBehaviour, ITickable
 
         moveAction = InputSystem.actions.FindAction("Move");
         jumpAction = InputSystem.actions.FindAction("Jump");
-        useAction = InputSystem.actions.FindAction("Use"); // may be null until the action is added
+        useAction = InputSystem.actions.FindAction("Use");
         if (moveAction == null) Debug.LogError("PlayerCommandInvoker: 'Move' input action not found.");
         if (jumpAction == null) Debug.LogError("PlayerCommandInvoker: 'Jump' input action not found.");
 

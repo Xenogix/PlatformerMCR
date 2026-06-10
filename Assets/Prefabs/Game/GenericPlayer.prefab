@@ -182,8 +182,9 @@ MonoBehaviour:
   moveSpeed: 8
   acceleration: 50
   deceleration: 35
-  jumpForce: 20
+  jumpForce: 22
   jumpBufferTime: 0.1
+  coyoteTime: 0.1
   ascentGravityMultiplier: 1.5
   lowJumpGravityMultiplier: 3
   fallGravityMultiplier: 2.5
@@ -193,6 +194,7 @@ MonoBehaviour:
   groundCheckSize: {x: 1, y: 0.1}
   groundCheckDistance: 0.05
   maxSlopeAngle: 60
+  gravityScale: 4
 --- !u!114 &2585045916330304231
 MonoBehaviour:
   m_ObjectHideFlags: 0

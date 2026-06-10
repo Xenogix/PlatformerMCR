@@ -14,3 +14,6 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::LevelPalette
   items:
   - prefab: {fileID: 590307943874230512, guid: fc422b2eccb3d284e86aa998a34f9bff, type: 3}
+  - prefab: {fileID: 173113226236005049, guid: 0955da60478639643a9df9d2f7107a29, type: 3}
+  - prefab: {fileID: 4735485804720175149, guid: be08c8eee298b47449398923ecd77762, type: 3}
+  - prefab: {fileID: 5974138318604807544, guid: 43b51b55837e9a1449fc497635fb3c17, type: 3}
