@@ -12,7 +12,7 @@ public sealed class DoorChannel : RewindChannel<bool>
 
     protected override IHistory<bool> NewHistory() => new SparseHistory<bool>();
 
-    protected override bool Read() => _door.IsOpen;
+    protected override bool Read() => _door.IsOpen();
 
     protected override void Write(bool isOpen) => _door.SetOpen(isOpen);
 }

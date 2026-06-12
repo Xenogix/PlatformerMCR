@@ -89,6 +89,10 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 9eb4ae40381ae458cb7b92fe1836ffcb, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::Door
+  doorRenderer: {fileID: 6536745404190398968}
+  doorCollider: {fileID: 832700546087339705}
+  closedMaterial: {fileID: 2100000, guid: bbdcadcdeb881ad43b74975c8ef66e16, type: 2}
+  openMaterial: {fileID: 2100000, guid: ef7a01db638df72458de450abd626117, type: 2}
 --- !u!114 &2526168736646165699
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -174,5 +178,10 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: ea79afe99ab07406aa849a1f90b14a6e, type: 3}
-  m_Name:
+  m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::RewindableEntity
+--- !u!23 &6536745404190398968 stripped
+MeshRenderer:
+  m_CorrespondingSourceObject: {fileID: -7511558181221131132, guid: 1e4d1cc002f21da41a0ade959bafb28d, type: 3}
+  m_PrefabInstance: {fileID: 5581854319693333884}
+  m_PrefabAsset: {fileID: 0}

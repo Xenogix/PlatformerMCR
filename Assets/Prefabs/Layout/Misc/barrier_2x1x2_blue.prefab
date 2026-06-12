@@ -72,6 +72,11 @@ PrefabInstance:
       insertIndex: -1
       addedObject: {fileID: 3741958206184372615}
   m_SourcePrefab: {fileID: 100100000, guid: b6f1e8dbd4b3e2b44a7b7892db4a0d22, type: 3}
+--- !u!23 &5325677352126155949 stripped
+MeshRenderer:
+  m_CorrespondingSourceObject: {fileID: -7511558181221131132, guid: b6f1e8dbd4b3e2b44a7b7892db4a0d22, type: 3}
+  m_PrefabInstance: {fileID: 6784970755205500969}
+  m_PrefabAsset: {fileID: 0}
 --- !u!1 &5974138318604807544 stripped
 GameObject:
   m_CorrespondingSourceObject: {fileID: 919132149155446097, guid: b6f1e8dbd4b3e2b44a7b7892db4a0d22, type: 3}
@@ -101,6 +106,10 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 9eb4ae40381ae458cb7b92fe1836ffcb, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::Door
+  doorRenderer: {fileID: 5325677352126155949}
+  doorCollider: {fileID: 5058329351477706370}
+  closedMaterial: {fileID: 2100000, guid: bbdcadcdeb881ad43b74975c8ef66e16, type: 2}
+  openMaterial: {fileID: 2100000, guid: ef7a01db638df72458de450abd626117, type: 2}
 --- !u!114 &5025494035352165822
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -174,5 +183,5 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: ea79afe99ab07406aa849a1f90b14a6e, type: 3}
-  m_Name:
+  m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::RewindableEntity
