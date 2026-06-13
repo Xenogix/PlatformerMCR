@@ -11,6 +11,10 @@ public abstract class RewindChannel<T> : MonoBehaviour, IRewindChannel where T :
 {
     private IHistory<T> _history;
 
+    // The owned history, exposed to subclasses that need to export the recorded run
+    // (e.g. RigidbodyChannel turning a dense capture into a best-run shadow path).
+    protected IHistory<T> History => _history;
+
     protected abstract T Read();                  // live -> memento
     protected abstract void Write(T state);       // memento -> live
     protected abstract IHistory<T> NewHistory();  // storage strategy (dense/sparse)

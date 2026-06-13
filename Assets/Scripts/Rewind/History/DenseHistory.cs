@@ -11,6 +11,13 @@ public sealed class DenseHistory<T> : IHistory<T> where T : struct
     private int _baseTick;   // tick of _values[0]
     private int _step;       // constant tick spacing (inferred from the first two records; 0 while <2 entries)
 
+    // Read-out for exporting a finished run (e.g. the best-run shadow). Sequential, not
+    // tick-addressed: entry i is the value captured at tick BaseTick + i (step == 1 under
+    // captureRate 1), so a caller can walk the path one tick at a time.
+    public int BaseTick => _baseTick;
+    public int Count => _values.Count;
+    public T ValueAt(int i) => _values[i];   // entry at tick BaseTick + i (step == 1 under captureRate 1)
+
     public void Record(int tick, T value)
     {
         if (_values.Count == 0) { _baseTick = tick; _step = 0; }
