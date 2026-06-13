@@ -26,7 +26,7 @@ public static class BestRunRecorder
 
         // FindObjectsInactive.Include picks up despawned-but-retained clones too, so a clone that
         // had already caught up to its spawn still contributes its (now dormant) path.
-        foreach (Player body in Object.FindObjectsByType<Player>(FindObjectsInactive.Include, FindObjectsSortMode.None))
+        foreach (Player body in Object.FindObjectsByType<Player>(FindObjectsInactive.Include))
         {
             var channel = body.GetComponent<RigidbodyChannel>();
             if (channel != null && channel.TryExportPositions(out int spawnTick, out List<Vector2> positions))
