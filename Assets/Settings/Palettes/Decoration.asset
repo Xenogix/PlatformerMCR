@@ -1,0 +1,19 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 35bbda1b0cf078c48ba02d108ea2e03e, type: 3}
+  m_Name: Decoration
+  m_EditorClassIdentifier: Assembly-CSharp::LevelPalette
+  items:
+  - prefab: {fileID: 4262103585841852262, guid: 467a1bc811a71bd4a8115d1fc61941b8, type: 3}
+  - prefab: {fileID: 3967498398522152187, guid: 4f0bc082022d81743b05a510fa545bdf, type: 3}
+  - prefab: {fileID: 3428986165832282439, guid: cdbd6ecc86d13794d911d713f9b10ea6, type: 3}
+  - prefab: {fileID: 1610773745090927316, guid: 6a20537043ed36c478d010d742185089, type: 3}

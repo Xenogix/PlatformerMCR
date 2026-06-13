@@ -48,6 +48,10 @@ PrefabInstance:
       propertyPath: m_LocalEulerAnglesHint.z
       value: 0
       objectReference: {fileID: 0}
+    - target: {fileID: -7511558181221131132, guid: 1e4d1cc002f21da41a0ade959bafb28d, type: 3}
+      propertyPath: 'm_Materials.Array.data[0]'
+      value: 
+      objectReference: {fileID: 2100000, guid: bbdcadcdeb881ad43b74975c8ef66e16, type: 2}
     - target: {fileID: 919132149155446097, guid: 1e4d1cc002f21da41a0ade959bafb28d, type: 3}
       propertyPath: m_Name
       value: barrier_2x1x4_blue
@@ -93,6 +97,7 @@ MonoBehaviour:
   doorCollider: {fileID: 832700546087339705}
   closedMaterial: {fileID: 2100000, guid: bbdcadcdeb881ad43b74975c8ef66e16, type: 2}
   openMaterial: {fileID: 2100000, guid: ef7a01db638df72458de450abd626117, type: 2}
+  isOpen: 0
 --- !u!114 &2526168736646165699
 MonoBehaviour:
   m_ObjectHideFlags: 0
