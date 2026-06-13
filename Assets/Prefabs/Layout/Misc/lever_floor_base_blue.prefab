@@ -10,11 +10,11 @@ PrefabInstance:
     m_Modifications:
     - target: {fileID: -8679921383154817045, guid: bdb7f6c09e55d4f4086036963a28b284, type: 3}
       propertyPath: m_LocalPosition.x
-      value: 0
+      value: 45
       objectReference: {fileID: 0}
     - target: {fileID: -8679921383154817045, guid: bdb7f6c09e55d4f4086036963a28b284, type: 3}
       propertyPath: m_LocalPosition.y
-      value: 0
+      value: 7
       objectReference: {fileID: 0}
     - target: {fileID: -8679921383154817045, guid: bdb7f6c09e55d4f4086036963a28b284, type: 3}
       propertyPath: m_LocalPosition.z
@@ -26,7 +26,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: -8679921383154817045, guid: bdb7f6c09e55d4f4086036963a28b284, type: 3}
       propertyPath: m_LocalRotation.x
-      value: 0.00000008146034
+      value: 0
       objectReference: {fileID: 0}
     - target: {fileID: -8679921383154817045, guid: bdb7f6c09e55d4f4086036963a28b284, type: 3}
       propertyPath: m_LocalRotation.y
@@ -34,7 +34,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: -8679921383154817045, guid: bdb7f6c09e55d4f4086036963a28b284, type: 3}
       propertyPath: m_LocalRotation.z
-      value: -0
+      value: 0
       objectReference: {fileID: 0}
     - target: {fileID: -8679921383154817045, guid: bdb7f6c09e55d4f4086036963a28b284, type: 3}
       propertyPath: m_LocalEulerAnglesHint.x
@@ -47,6 +47,38 @@ PrefabInstance:
     - target: {fileID: -8679921383154817045, guid: bdb7f6c09e55d4f4086036963a28b284, type: 3}
       propertyPath: m_LocalEulerAnglesHint.z
       value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 393011252310192388, guid: bdb7f6c09e55d4f4086036963a28b284, type: 3}
+      propertyPath: m_LocalPosition.x
+      value: 0.004
+      objectReference: {fileID: 0}
+    - target: {fileID: 393011252310192388, guid: bdb7f6c09e55d4f4086036963a28b284, type: 3}
+      propertyPath: m_LocalPosition.y
+      value: 0.335
+      objectReference: {fileID: 0}
+    - target: {fileID: 393011252310192388, guid: bdb7f6c09e55d4f4086036963a28b284, type: 3}
+      propertyPath: m_LocalPosition.z
+      value: -0
+      objectReference: {fileID: 0}
+    - target: {fileID: 393011252310192388, guid: bdb7f6c09e55d4f4086036963a28b284, type: 3}
+      propertyPath: m_LocalRotation.w
+      value: 0.92391294
+      objectReference: {fileID: 0}
+    - target: {fileID: 393011252310192388, guid: bdb7f6c09e55d4f4086036963a28b284, type: 3}
+      propertyPath: m_LocalRotation.x
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 393011252310192388, guid: bdb7f6c09e55d4f4086036963a28b284, type: 3}
+      propertyPath: m_LocalRotation.y
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 393011252310192388, guid: bdb7f6c09e55d4f4086036963a28b284, type: 3}
+      propertyPath: m_LocalRotation.z
+      value: 0.38260284
+      objectReference: {fileID: 0}
+    - target: {fileID: 393011252310192388, guid: bdb7f6c09e55d4f4086036963a28b284, type: 3}
+      propertyPath: m_LocalEulerAnglesHint.z
+      value: 44.99
       objectReference: {fileID: 0}
     - target: {fileID: 919132149155446097, guid: bdb7f6c09e55d4f4086036963a28b284, type: 3}
       propertyPath: m_Name
@@ -127,10 +159,59 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::Lever
   On:
     m_PersistentCalls:
-      m_Calls: []
+      m_Calls:
+      - m_Target: {fileID: 0}
+        m_TargetAssemblyTypeName: Door, Assembly-CSharp
+        m_MethodName: SetOpen
+        m_Mode: 6
+        m_Arguments:
+          m_ObjectArgument: {fileID: 0}
+          m_ObjectArgumentAssemblyTypeName: UnityEngine.Object, UnityEngine
+          m_IntArgument: 0
+          m_FloatArgument: 0
+          m_StringArgument: 
+          m_BoolArgument: 1
+        m_CallState: 1
+      - m_Target: {fileID: 0}
+        m_TargetAssemblyTypeName: Door, Assembly-CSharp
+        m_MethodName: SetOpen
+        m_Mode: 6
+        m_Arguments:
+          m_ObjectArgument: {fileID: 0}
+          m_ObjectArgumentAssemblyTypeName: UnityEngine.Object, UnityEngine
+          m_IntArgument: 0
+          m_FloatArgument: 0
+          m_StringArgument: 
+          m_BoolArgument: 1
+        m_CallState: 2
   Off:
     m_PersistentCalls:
-      m_Calls: []
+      m_Calls:
+      - m_Target: {fileID: 0}
+        m_TargetAssemblyTypeName: Door, Assembly-CSharp
+        m_MethodName: SetOpen
+        m_Mode: 6
+        m_Arguments:
+          m_ObjectArgument: {fileID: 0}
+          m_ObjectArgumentAssemblyTypeName: UnityEngine.Object, UnityEngine
+          m_IntArgument: 0
+          m_FloatArgument: 0
+          m_StringArgument: 
+          m_BoolArgument: 0
+        m_CallState: 1
+      - m_Target: {fileID: 0}
+        m_TargetAssemblyTypeName: Door, Assembly-CSharp
+        m_MethodName: SetOpen
+        m_Mode: 6
+        m_Arguments:
+          m_ObjectArgument: {fileID: 0}
+          m_ObjectArgumentAssemblyTypeName: UnityEngine.Object, UnityEngine
+          m_IntArgument: 0
+          m_FloatArgument: 0
+          m_StringArgument: 
+          m_BoolArgument: 0
+        m_CallState: 2
+  pivot: {fileID: 0}
 --- !u!61 &5824317960342718569
 BoxCollider2D:
   m_ObjectHideFlags: 0
@@ -187,7 +268,7 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 771e597619b11d01a9e41414f9d8f884, type: 3}
-  m_Name:
+  m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::LeverChannel
 --- !u!114 &1635249807312468953
 MonoBehaviour:
@@ -199,5 +280,5 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: ea79afe99ab07406aa849a1f90b14a6e, type: 3}
-  m_Name:
+  m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::RewindableEntity
