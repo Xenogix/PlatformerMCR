@@ -15,6 +15,16 @@ MonoBehaviour:
   m_GroupName: Default Local Group
   m_GUID: ea59244a1f414a8478952af25c7ad404
   m_SerializeEntries:
+  - m_GUID: 1a3e28a5871d4673e9a452899032494f
+    m_Address: Assets/Scenes/Levels/Level07.unity
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 3d0bd5ffe9aa283efa5fc760fdb4569b
+    m_Address: Assets/Scenes/Levels/Level08.unity
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: 60980494e778c4947893cb6fecf0e872
     m_Address: levelSet
     m_ReadOnly: 0
@@ -25,13 +35,18 @@ MonoBehaviour:
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 6aad8b4d9754b741f97116eabcb01d06
+    m_Address: Assets/Scenes/Levels/Level06.unity
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: 745dddc10e268c847b0a77b459883283
     m_Address: Assets/Scenes/Levels/Level01.unity
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: b040aea9054feede8bb1243f752f2901
-    m_Address: Assets/Scenes/Levels/Level06.unity
+    m_Address: Assets/Scenes/Levels/Level09.unity
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
