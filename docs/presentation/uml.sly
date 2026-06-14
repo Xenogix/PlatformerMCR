@@ -220,6 +220,9 @@
         <variable const="false" name="tick" type="int"/>
         <variable const="false" name="dt" type="float"/>
       </method>
+      <method isAbstract="false" isStatic="false" name="RewindResync" returnType="void" view="DEFAULT" visibility="PUBLIC">
+        <variable const="false" name="tick" type="int"/>
+      </method>
     </entity>
     <entity entityType="CLASS" id="25282" isAbstract="false" name="RewindDirector" visibility="PUBLIC"/>
     <entity entityType="CLASS" id="25281" isAbstract="false" name="CommandTimeline" visibility="PUBLIC">
@@ -236,6 +239,10 @@
       </method>
       <method isAbstract="false" isStatic="false" name="TruncateAfterTick" returnType="void" view="DEFAULT" visibility="PUBLIC">
         <variable const="false" name="tick" type="int"/>
+      </method>
+      <method isAbstract="false" isStatic="false" name="CarriedStickyAt" returnType="void" view="DEFAULT" visibility="PUBLIC">
+        <variable const="false" name="tick" type="int"/>
+        <variable const="false" name="into" type="List&lt;ICommand&gt;"/>
       </method>
     </entity>
     <entity entityType="CLASS" id="25295" isAbstract="false" name="ClonePlayback" visibility="PUBLIC">
@@ -871,7 +878,7 @@
         <h>70</h>
       </geometry>
     </componentView>
-    <note color="-2079" content="Récepteur passé en argument !">
+    <note color="-2079" content="Rï¿½cepteur passï¿½ en argument !">
       <noteGeometry>
         <x>270</x>
         <y>590</y>
@@ -889,7 +896,7 @@
         </point>
       </noteLine>
     </note>
-    <note color="-2079" content="Sticky : l'effet persiste après la commande, sparse">
+    <note color="-2079" content="Sticky : l'effet persiste aprï¿½s la commande, sparse">
       <noteGeometry>
         <x>230</x>
         <y>690</y>

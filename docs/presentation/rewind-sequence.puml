@@ -1,37 +1,64 @@
 @startuml rewind-sequence
-title Rewind runtime - capture each tick, then commit a jump-back and leave an echo
+title Rewind runtime — capture each tick, then commit a jump-back and leave an echo
 
 skinparam shadowing false
 skinparam defaultFontName sans-serif
+skinparam sequenceMessageAlign center
+hide footbox
+autonumber "<b>[00]"
 
-participant GameClock
-participant "RewindCaretaker" as Caretaker
-participant "RewindableEntity" as Entity
-participant "IHistory<T>" as History
-participant "RewindDirector" as Director
-participant "EchoSpawner" as Spawner
+box "Time" #F4F4F4
+  participant GameClock as clock
+end box
+box "Memento core" #EAF2FB
+  participant RewindCaretaker as caretaker
+  participant RewindableEntity as entity
+  participant "IHistory<T>" as history
+end box
+box "Rewind + clone" #FFF7EF
+  participant RewindDirector as director
+  participant EchoSpawner as spawner
+end box
 
-== Each fixed tick: snapshot the ENTERING state ==
-GameClock -> Caretaker : Tick(t)   // observers run FIRST
-Caretaker -> Entity : Capture(t)
-Entity -> History : Record(t, Read())
-GameClock -> GameClock : movers act\n(player invoker, clone playbacks)
-GameClock -> GameClock : Tick++
+== Each fixed tick — snapshot the ENTERING state ==
+clock -> caretaker : Tick(t)
+note right of clock : observers run **first**,\nbefore any mover acts
+activate caretaker
+caretaker -> entity : Capture(t)
+activate entity
+entity -> history : Record(t, Read())
+deactivate entity
+deactivate caretaker
+clock -> clock : movers act\n(player invoker, clone playbacks)
+clock -> clock : Tick++  (in a finally)
 
-== Player confirms a rewind + clone (RewindDirector) ==
-Director -> Caretaker : Commit(target)
-loop each entity
-  Caretaker -> Entity : RestoreTo(target)
-  Entity -> History : TryValueAt(target) -> Write
-  Caretaker -> Entity : DiscardAfter(target)\n[only if alive @ target]
+== Player confirms a rewind + clone ==
+director -> caretaker : Commit(target)
+activate caretaker
+loop each registered entity
+  caretaker -> entity : RestoreTo(target)
+  activate entity
+  entity -> history : TryValueAt(target) → Write
+  deactivate entity
+  caretaker -> entity : DiscardAfter(target)
+  note right of entity : only if **alive @ target** —\nthe unborn keep their future
 end
-Caretaker -> GameClock : RewindTo(target)
-Director -> Director : Timeline.SliceFromTick(target)
-Director -> Spawner : Spawn(echoPrefab, state@target, sliced script)
-note over Spawner
+caretaker -> clock : RewindTo(target)
+deactivate caretaker
+director -> director : Timeline.SliceFromTick(target)
+director -> spawner : Spawn(echoPrefab, state@target, sliced script)
+note over spawner
   The echo replays the sliced commands by
-  ABSOLUTE tick, so a later rewind rewinds
+  **absolute tick**, so a later rewind rewinds
   it for free; its pose is restored by its
   own RewindableEntity.
 end note
+
+legend left
+  |= notation |= meaning |
+  | solid arrow | synchronous call |
+  | dashed arrow | return value |
+  | ENTERING state | pose/velocity the tick is about to consume |
+endlegend
+
 @enduml

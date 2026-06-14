@@ -3,8 +3,9 @@
 Presentation material — how we used the pattern, the choices we made, the strengths
 we exploited, what we left out, and how we adapted it.
 
-Diagrams: `command-pattern-class-diagram.puml` (class) and `command-pattern-sequence.puml`
-(record → slice → replay). Regenerate with `plantuml -tsvg *.puml`.
+Diagrams: `uml.sly` (class diagram, edited in Slyum → `command.pdf`) and
+`command-pattern-sequence.puml` (record → slice → replay). Regenerate the sequence
+with `plantuml -tsvg command-pattern-sequence.puml`.
 
 ---
 

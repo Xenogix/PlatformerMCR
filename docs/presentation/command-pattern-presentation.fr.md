@@ -3,9 +3,9 @@
 Support de présentation — comment nous avons utilisé le patron, les choix effectués,
 les forces exploitées, ce que nous avons laissé de côté, et comment nous l'avons adapté.
 
-Diagrammes : `command-pattern-class-diagram.fr.puml` (classes) et
+Diagrammes : `uml.sly` (diagramme de classes, édité dans Slyum → `command.pdf`) et
 `command-pattern-sequence.fr.puml` (enregistrement → découpe → rejeu).
-Régénérer avec `plantuml -tsvg *.fr.puml`.
+Régénérer la séquence avec `plantuml -tsvg command-pattern-sequence.fr.puml`.
 
 ---
 

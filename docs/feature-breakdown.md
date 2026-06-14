@@ -8,12 +8,11 @@ The game is a CRT‑TV‑themed puzzle‑platformer whose headline mechanic is *
 
 ## Diagrams
 
-Rendered under `docs/presentation/` (PlantUML source + PNG/SVG):
+Under `docs/presentation/`. Class diagrams are authored in Slyum (`*.sly`, exported to `*.pdf`); the two sequences are PlantUML (`*.puml` → `*.svg`).
 
-- **`system-overview`** — the whole system at a glance (the map below, in one picture).
-- **`command-pattern-class-diagram`** / **`command-pattern-sequence`** — input recorded once, replayed on clones.
-- **`memento-pattern-class-diagram`** — rewindable state (Caretaker / Originator / Memento) + the Dense‑vs‑Sparse storage Strategy.
-- **`rewind-sequence`** — capture each tick, then commit a jump‑back and spawn an echo.
+- **overview** — `system-overview.sly`
+- **command pattern** — `uml.sly` (classes) + `command-pattern-sequence.puml`
+- **memento pattern** — `memento.sly` (classes) + `rewind-sequence.puml`
 
 ---
 
@@ -43,7 +42,7 @@ Everything deterministic hangs off a single integer `Tick`. Each fixed step the 
 | `Assets/Scripts/Rewind/RewindableEntity.cs` | One rewindable object: its channels **and** its existence ("alive record"). |
 | `Assets/Scripts/Rewind/Channels/RewindChannel.cs` (+ `IRewindChannel`) | A rewindable slice of an object; owns its history, delegates Read/Write. |
 | `…/Channels/RigidbodyChannel.cs` | Position + rotation + both velocities for a physics body. |
-| `…/Channels/ToggleableChannel.cs` | On/off state for an interactable (see §7). |
+| `…/Channels/ToggleableChannel.cs` | On/off state for an interactable (see §6). |
 | `…/History/IHistory.cs`, `DenseHistory.cs`, `SparseHistory.cs` | The two storage strategies. |
 
 **Memento + Strategy.** A channel is the originator/memento; the *storage logic* lives behind `IHistory<T>` so a channel just picks a strategy:
@@ -51,11 +50,11 @@ Everything deterministic hangs off a single integer `Tick`. Each fixed step the 
 - **`DenseHistory`** — one value per cadence tick, addressed by `baseTick + i*step`, O(1) and no per‑entry tick stored. Used for continuous data (rigidbody pose). **Choice:** dense because it changes every tick anyway.
 - **`SparseHistory`** — change‑only with carry‑forward, binary‑searched. Used for rarely‑changing flags (alive, lever/door state). **Choice:** sparse to keep per‑tick allocation near zero.
 
-**Choice — deferred destruction + an "alive record" instead of `Destroy`.** A despawned object is **deactivated and retained**, and its existence is a `SparseHistory<bool>` on the entity. Existence rule: an entity exists at tick T iff its alive record carries `true` at T (default `false` before its first capture). Rewinding past a death reactivates the retained instance; an object only gets truly `Destroy`‑ed once it's dormant *and* its last alive‑change has aged out of the window (it can never be a rewind target again). This is why doors **don't** use `SetActive` (see §7) — that collided with this dormancy.
+**Choice — deferred destruction + an "alive record" instead of `Destroy`.** A despawned object is **deactivated and retained**, and its existence is a `SparseHistory<bool>` on the entity. Existence rule: an entity exists at tick T iff its alive record carries `true` at T (default `false` before its first capture). Rewinding past a death reactivates the retained instance; an object only gets truly `Destroy`‑ed once it's dormant *and* its last alive‑change has aged out of the window (it can never be a rewind target again). This is why doors **don't** use `SetActive` (see §6) — that collided with this dormancy.
 
-**Choice — asymmetric discard on commit.** `Commit(tick)` restores everyone, but only `DiscardAfter(tick)` the histories of entities **alive at the target**. An entity *not yet born* at the target keeps its future, so when the clock replays forward into its birth it can be revived — otherwise a clone you rewound past its own spawn would be erased.
+**Choice — asymmetric discard on commit.** `Commit(tick)` does two things per entity, but on different sets. It **restores every** entity to the target tick (the new timeline starts there for all of them), yet it only **discards the post-target history** of entities that were **alive at the target**. The asymmetry is the point: a committed rewind starts recording an alternate future, so an entity that already exists at the target must drop its now-stale future to record over it cleanly — but an entity *not yet born* at the target must **keep** its future, because that future (its spawn marker and replay lane) is exactly what revives it when the clock replays forward into its birth tick. Discarding it too would erase a clone you rewound past its own spawn, permanently.
 
-**Fix this round — revive corruption.** `PrepareCapture` (revive) clears the dense channels but the alive record is sparse; the immediately‑following `Capture` would append `true@birth` *after* a later `false@despawn`, breaking the change‑only history's ascending‑tick invariant (its binary search then misreads). Fixed by `DiscardAfter(tick)`‑ing the alive record on revive. (Only bit after rewinding past a *finished* clone — "works in most cases.")
+**Fix this round — revive corruption.** `PrepareCapture` (revive) clears the dense channels but the alive record is sparse; the immediately‑following `Capture` would append `true@birth` *after* a later `false@despawn`, breaking the change‑only history's ascending‑tick invariant (its binary search then misreads). Fixed by `DiscardAfter(tick)`‑ing the alive record on revive. (This only surfaces when you rewind past a clone that has already *finished* its replay; it stays latent otherwise — which is why it read as "works in most cases.")
 
 ---
 
@@ -73,7 +72,7 @@ Everything deterministic hangs off a single integer `Tick`. Each fixed step the 
 **Choice — sparse recording with sticky vs discrete.** Continuous state (`Move`, `JumpHeld`) is `IStickyCommand`: recorded only when it *changes* and carried forward; discrete one‑shots (`Jump`, `Use`) are recorded only on the tick pressed. Most ticks store nothing. On a rewind‑split, `CommandTimeline.SliceFromTick` re‑establishes the latest sticky command of each kind at the slice start, so a clone resumes mid‑stride.
 
 **Fixes this round (echo‑input bleed):**
-- The invoker's change‑detection baseline (`lastMove`/`lastJumpHeld`) wasn't reset on rewind, so a resume input that *looked* unchanged got suppressed and the timeline carried a stale sticky value forward — a clone sliced from there replayed the wrong movement. Now it re‑emits the sticky state on a backward tick.
+- **Carried intent at the rewind seam.** After a rewind commits, the live player still held its *pre‑rewind* sticky intent, so the first re‑recorded frame was a spurious stop — and a clone sliced from that tick replayed the stop over its real `Move`, sitting still instead of falling. `PlayerCommandInvoker.RewindResync(tick)` fixes it: reset the sticky baseline to idle, then re‑apply whatever the timeline *carries into* the seam via `CommandTimeline.CarriedStickyAt` (the same backward opener‑scan `SliceFromTick` uses to seed a clone). Both the live recording and any slice taken from it stay coherent. `RewindDirector` calls it on both `ConfirmRewind` **and** `ConfirmClone`.
 - `RewindDirector.ConfirmRewind` truncated commands to `target` while the clock resumes *at* `target` and re‑records it → two frames at one tick (binary search ambiguity). Now truncates to `target‑1`.
 - Press latches are cleared **before** `Execute`, so a throwing command can't leave a press latched and re‑fire every tick.
 
@@ -89,7 +88,7 @@ Everything deterministic hangs off a single integer `Tick`. Each fixed step the 
 
 **Choice — replay by *absolute clock tick*, not a spawn‑relative index.** `ClonePlayback` executes the command recorded for the current clock tick (`GetAtTick`). So a clock rewind automatically rewinds the replay for free, and the echo's pose is restored by its own `RigidbodyChannel`. Forward, physics is non‑deterministic so echoes drift — that divergence is the point.
 
-**Choice — clone retires via the rewind seam, not death.** When a replay catches up to where it was spawned, the echo `Despawn`s (deactivate + retain), so scrubbing back into its `[spawn, end]` window revives it — its alive record matches its timeline lane. Echoes are seeded from the Rigidbody (which holds the restored state right after a rewind), and deep spawn overlaps are handled by the controller (§6).
+**Choice — clone retires via the rewind seam, not death.** When a replay catches up to where it was spawned, the echo `Despawn`s (deactivate + retain), so scrubbing back into its `[spawn, end]` window revives it — its alive record matches its timeline lane. Echoes are seeded from the Rigidbody (which holds the restored state right after a rewind), and deep spawn overlaps are handled by the controller (§5).
 
 ---
 
@@ -103,8 +102,8 @@ Everything deterministic hangs off a single integer `Tick`. Each fixed step the 
 
 Dynamic body with **custom gravity** (`gravityScale = 0`, gravity applied in code) so jump feel stays tunable; velocity is set every tick and the solver resolves contacts.
 
-- **Choice — momentum conservation above move speed** (`ResolveSpeed`): driving the same way faster than the input target bleeds down only at a gentle rate (0 = full conserve), so speed earned off a fast platform or slope is kept; air always conserves.
-- **Coupling / carry:** movement works *relative* to the surface/contact velocity (`baseVelocity`), measured against last tick's base so a carrier's own acceleration isn't absorbed — rigid "snappy carry" rather than friction‑lag. Side‑pushes from bodies pressing into us are inherited horizontally (capped), opposing pushers cancel.
+- **Choice — momentum conservation above move speed** (`ResolveSpeed`): driving the same way faster than the input target bleeds back down toward it at a tunable rate (`overspeedBleed`, where `0` never bleeds = full conserve), so speed earned off a fast platform or slope is kept; air always conserves.
+- **Coupling / carry:** movement works *relative* to the surface/contact velocity (`baseVelocity`): our own speed is measured against *last* tick's base, not this tick's, so a carrier's own acceleration — already folded into this tick's base — isn't mistaken for ours and bled away. The result is rigid "snappy carry" rather than friction‑lag. Side‑pushes from bodies pressing into us are inherited horizontally (capped), opposing pushers cancel.
 - **Rewind‑safe timing:** jump buffer, coyote time and post‑jump ground‑suppress are stored as absolute tick *stamps* compared to the current tick, so a backward tick invalidates them (no phantom jumps).
 - **Deep‑overlap resolution** (`ResolveCharacterOverlaps`): two characters overlapping deeply (a clone spawned/rewound *into* another) ignore their collision until nearly clear, with hysteresis — covers spawn, revive and rewind‑reposition with one rule.
 - Frictionless shared material (carry is done by velocity matching, not friction); into‑wall x is cancelled so a frictionless steep slope can't slide us up.
@@ -115,7 +114,7 @@ Dynamic body with **custom gravity** (`gravityScale = 0`, gravity applied in cod
 
 | File | Role |
 |------|------|
-| `Assets/Scripts/Interactables/Toggleable.cs` | Base: `startActive`/`IsActive`/`SetActive`/`Toggle`; toggles child renderers + colliders (lazy‑cached, null‑safe). |
+| `Assets/Scripts/Interactables/Toggleable.cs` | Base: `startActive`/`IsActive`/`SetActive`/`Toggle`; drives child renderers + colliders (lazy‑cached, null‑safe). With an `activeMaterial`/`inactiveMaterial` pair set, stays visible and swaps the material (solid↔translucent) instead of hiding. |
 | `…/Interactables/Lever.cs` | `Lever : Toggleable, IInteractable`; holds a `Toggleable[]` target list, cascades `Toggle()`. |
 | `…/Interactables/IInteractable.cs` | `Interact()`. |
 | `Assets/Scripts/Hazards/Hazard.cs` | `OnTriggerEnter2D → Entity.Kill()`. |
@@ -124,13 +123,13 @@ Dynamic body with **custom gravity** (`gravityScale = 0`, gravity applied in cod
 
 **Choice — one generic `Toggleable`, replacing `Door` + per‑scene `UnityEvent` wiring.** The old system had a `Door` and a `Lever` whose `On`/`Off` `UnityEvent`s were wired to each door per scene (a long action list). It was replaced by: a component you drop on *any* prefab with a default state, and a lever that holds **direct references** to its targets.
 
-**Choice — toggle semantics, not absolute set.** A lever **flips** each target (each keeps its own `startActive` default); levers can target other levers (cascade is cycle‑guarded). "Active" = renderers + colliders enabled (present/blocking/harmful); inactive = hidden + passable/safe.
+**Choice — toggle semantics, not absolute set.** A lever **flips** each target (each keeps its own `startActive` default); levers can target other levers (cascade is cycle‑guarded). The **collider always follows the state** — active = blocking/harmful, inactive = passable/safe — while the *look* is configurable: with a material pair assigned the object stays on‑screen and swaps **solid↔translucent** (imported from main's translucent‑door style); without one it falls back to hiding the renderers outright.
 
 **Choice — the cascade is rewind‑safe by construction.** Every toggleable carries its own `RewindableEntity + ToggleableChannel`. The cascade (`Lever.Toggle → target.Toggle`) runs **only** during live play and clone replay (via `UseCommand`). Rewind *restore* goes through `SetActive`, which applies only the object's own effect (renderers/handle) and **never cascades** — so scrubbing restores every lever/door/spike independently, no double‑driving.
 
 **Choice — doors stay active, toggle renderer/collider** (not `SetActive(false)`): deactivating the GameObject collided with `RewindableEntity`'s own dormancy and produced impossible rewind states.
 
-Prefabs: `barrier_2x1x{2,4}_blue` migrated to `Toggleable + ToggleableChannel`; new `spike_hazard` prefab (real floor‑spike mesh, base + spikes child carrying the `Hazard` + kill‑trigger) registered in the Level Painter *Hazards* palette (`Assets/Prefabs/Layout/Hazards/spike_hazard.prefab`).
+Prefabs: `barrier_2x1x{2,4}_blue` migrated to `Toggleable + ToggleableChannel` and given the door material pair (`DoorClosed` solid / `DoorOpen` translucent); `spike_hazard` (real floor‑spike mesh, base + spikes child carrying the `Hazard` + kill‑trigger) ghosts out via a `SpikeGhost` translucent material when disarmed, registered in the Level Painter *Hazards* palette (`Assets/Prefabs/Layout/Hazards/spike_hazard.prefab`). Levels 05/06 wire `Lever → doors` directly, replacing main's dropped `DoorGroup` (orphaned `Door`/`DoorGroup` components stripped).
 
 ---
 
@@ -162,7 +161,7 @@ Prefabs: `barrier_2x1x{2,4}_blue` migrated to `Toggleable + ToggleableChannel`; 
 
 The roster is data‑driven (`LevelSet`, addressable address `levelSet`). `FinishFlag` records the best run **before** unloading (bodies still alive), then routes through `LevelTransition` (snow → load) if present, else loads directly.
 
-**Choice this round — loop the roster.** `LevelLoader.LoadNext` now wraps modulo the set (`(Index+1) % count`), so finishing the last level returns to the first. The `LevelSet` was completed to all nine scenes in order (01→09); previously it skipped 06–08 and ended at 09. Every level carries the finish‑flag prefab, so the loop progresses through each. *(Note: Level 6's two formerly open‑by‑default doors now toggle, so its lever closes them on first pull — flagged for a playtest.)*
+**Choice this round — loop the roster.** `LevelLoader.LoadNext` wraps modulo the set (`(Index+1) % count`), so finishing the last level returns to the first. After merging `main`, the roster is **ten** scenes in order 01→10: main's level took slot 6, and our former 06–09 shifted up to **07–10** (addressable addresses normalized to the new paths, clearing the stale Level06 address collision). Every level carries the finish‑flag prefab, so the loop runs 10→01 through each.
 
 ---
 
