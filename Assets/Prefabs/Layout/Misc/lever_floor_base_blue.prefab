@@ -90,9 +90,6 @@ PrefabInstance:
     m_AddedComponents:
     - targetCorrespondingSourceObject: {fileID: 919132149155446097, guid: bdb7f6c09e55d4f4086036963a28b284, type: 3}
       insertIndex: -1
-      addedObject: {fileID: 3104011032184906843}
-    - targetCorrespondingSourceObject: {fileID: 919132149155446097, guid: bdb7f6c09e55d4f4086036963a28b284, type: 3}
-      insertIndex: -1
       addedObject: {fileID: 8662140193690354958}
     - targetCorrespondingSourceObject: {fileID: 919132149155446097, guid: bdb7f6c09e55d4f4086036963a28b284, type: 3}
       insertIndex: -1
@@ -112,22 +109,6 @@ GameObject:
   m_CorrespondingSourceObject: {fileID: 919132149155446097, guid: bdb7f6c09e55d4f4086036963a28b284, type: 3}
   m_PrefabInstance: {fileID: 1055650313777002472}
   m_PrefabAsset: {fileID: 0}
---- !u!114 &3104011032184906843
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 173113226236005049}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 57d176a315faa4f18b73a16f26faf1fe, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::InteractionDetector
-  interactRadius: 1.5
-  interactableLayer:
-    serializedVersion: 2
-    m_Bits: 4294967295
 --- !u!114 &8662140193690354958
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -157,60 +138,8 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 66698e8561d9548179b4d7fe7b73f110, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::Lever
-  On:
-    m_PersistentCalls:
-      m_Calls:
-      - m_Target: {fileID: 0}
-        m_TargetAssemblyTypeName: Door, Assembly-CSharp
-        m_MethodName: SetOpen
-        m_Mode: 6
-        m_Arguments:
-          m_ObjectArgument: {fileID: 0}
-          m_ObjectArgumentAssemblyTypeName: UnityEngine.Object, UnityEngine
-          m_IntArgument: 0
-          m_FloatArgument: 0
-          m_StringArgument: 
-          m_BoolArgument: 1
-        m_CallState: 1
-      - m_Target: {fileID: 0}
-        m_TargetAssemblyTypeName: Door, Assembly-CSharp
-        m_MethodName: SetOpen
-        m_Mode: 6
-        m_Arguments:
-          m_ObjectArgument: {fileID: 0}
-          m_ObjectArgumentAssemblyTypeName: UnityEngine.Object, UnityEngine
-          m_IntArgument: 0
-          m_FloatArgument: 0
-          m_StringArgument: 
-          m_BoolArgument: 1
-        m_CallState: 2
-  Off:
-    m_PersistentCalls:
-      m_Calls:
-      - m_Target: {fileID: 0}
-        m_TargetAssemblyTypeName: Door, Assembly-CSharp
-        m_MethodName: SetOpen
-        m_Mode: 6
-        m_Arguments:
-          m_ObjectArgument: {fileID: 0}
-          m_ObjectArgumentAssemblyTypeName: UnityEngine.Object, UnityEngine
-          m_IntArgument: 0
-          m_FloatArgument: 0
-          m_StringArgument: 
-          m_BoolArgument: 0
-        m_CallState: 1
-      - m_Target: {fileID: 0}
-        m_TargetAssemblyTypeName: Door, Assembly-CSharp
-        m_MethodName: SetOpen
-        m_Mode: 6
-        m_Arguments:
-          m_ObjectArgument: {fileID: 0}
-          m_ObjectArgumentAssemblyTypeName: UnityEngine.Object, UnityEngine
-          m_IntArgument: 0
-          m_FloatArgument: 0
-          m_StringArgument: 
-          m_BoolArgument: 0
-        m_CallState: 2
+  startActive: 1
+  targets: []
   pivot: {fileID: 0}
 --- !u!61 &5824317960342718569
 BoxCollider2D:
@@ -267,9 +196,9 @@ MonoBehaviour:
   m_GameObject: {fileID: 173113226236005049}
   m_Enabled: 1
   m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 771e597619b11d01a9e41414f9d8f884, type: 3}
+  m_Script: {fileID: 11500000, guid: 71723bc9186a5728c945de1cb6df7cd9, type: 3}
   m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::LeverChannel
+  m_EditorClassIdentifier: Assembly-CSharp::ToggleableChannel
 --- !u!114 &1635249807312468953
 MonoBehaviour:
   m_ObjectHideFlags: 0
