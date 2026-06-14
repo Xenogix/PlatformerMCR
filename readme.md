@@ -13,16 +13,7 @@ Le pattern Commande est particulièrement utile pour enregistrer les actions du 
 
 - Captures d'écran / aperçu
 
-## 2. Le modèle Command
-
-> _Présentation théorique synthétique du pattern : intention, problème résolu, participants
-> (Command, ConcreteCommand, Invoker, Receiver, Client)._
-
-- Intention et motivation
-- Structure générale (UML du pattern « pur »)
-- Avantages / inconvénients
-
-## 3. Mise en oeuvre du modèle dans l'application
+## 2. Mise en oeuvre du modèle dans l'application
 
 > _Coeur du rapport : comment Command est concrètement implémenté dans le projet et
 > pourquoi il est ici pertinent (enregistrement des entrées, rewind, rejeu sur les clones)._
@@ -36,7 +27,7 @@ Le pattern Commande est particulièrement utile pour enregistrer les actions du 
 - Cycle d'une commande (capture -> exécution -> enregistrement -> rejeu)
 - Choix de conception et alternatives écartées
 
-### 3.1 Détails d'implémentations
+### 2.1 Détails d'implémentations
 
 Premièrement, le temps et le passage du temps est implémenté par deux classes custom, afin que nous puissions parfaitement le contrôler.
 
@@ -107,24 +98,24 @@ Deux choix de conception portent le pattern :
 
 `PlayerController` est le *receiver* concret du mouvement : c'est lui que `Player` appelle quand une commande s'exécute. Il s'appuie sur une gravité maison (`gravityScale = 0`, tout est calculé dans le code) pour garder un saut bien réglable, et pose directement la vélocité du corps à chaque tick — le moteur physique ne fait plus que résoudre les collisions. Les fenêtres de tolérance du saut, comme le buffer d'entrée et le *coyote time*, sont enregistrées en ticks absolus : dès qu'on rembobine d'un tick, elles redeviennent caduques, ce qui évite les sauts fantômes après un retour en arrière. Enfin, le déplacement se calcule relativement à la vélocité de la surface sur laquelle on se tient (`baseVelocity`), si bien que le joueur comme ses échos se laissent porter naturellement par les plateformes mobiles et même par les autres clones.
 
-## 4. Diagramme de classes
+## 3. Diagramme de classes
 
-### 4.1 Aperçu global
+### 3.1 Aperçu global
 ![Aperçu global](rapport/diagrams/system-overview.svg)
 
-### 4.2 Diagramme d'implémentation du pattern Command
+### 3.2 Diagramme d'implémentation du pattern Command
 ![Implémentation du pattern Command](rapport/diagrams/command.png)
 
-### 4.3 Diagramme d'implémentation du pattern Memento
+### 3.3 Diagramme d'implémentation du pattern Memento
 ![Implémentation du pattern Memento](rapport/diagrams/memento.svg)
 
-## 5. Déploiement
+## 4. Déploiement
 
-### 5.1 Jouer à une version précompilée
+### 4.1 Jouer à une version précompilée
 
 Le moyen le plus simple d'essayer le jeu est de télécharger une version précompilée. Des binaires pour Windows et Linux (x86-64) sont disponibles dans la section [releases](https://github.com/Xenogix/PlatformerMCR/releases) du dépôt. Il suffit de télécharger l'archive correspondant à votre plateforme, de l'extraire, puis de lancer l'exécutable.
 
-### 5.2 Ouvrir le projet pour le développement
+### 4.2 Ouvrir le projet pour le développement
 
 Pour développer ou compiler le projet vous-même :
 
@@ -132,7 +123,7 @@ Pour développer ou compiler le projet vous-même :
 2. **Installer [Unity Hub](https://docs.unity.com/en-us/hub/install-hub)**, qui gère les versions de l'éditeur Unity.
 3. **Ouvrir le dossier racine du projet** depuis Unity Hub. Celui-ci détectera la version de Unity requise et vous proposera de l'installer automatiquement. Ce projet utilise **Unity 6**, version `6000.4.6f1`.
 
-### 5.3 Compiler le projet
+### 4.3 Compiler le projet
 
 Une fois le projet ouvert dans l'éditeur Unity :
 
@@ -140,14 +131,14 @@ Une fois le projet ouvert dans l'éditeur Unity :
 2. Sélectionnez la plateforme cible (les plateformes disponibles dépendent des modules installés avec Unity).
 3. Choisissez le dossier de destination de la compilation. Nous recommandons un dossier `Builds/` à la racine du projet. Ce dossier est déjà ignoré par git.
 
-## 6. Utilisation
+## 5. Utilisation
 
 > _Comment jouer / utiliser l'application._
 
 - Contrôles
 - Déroulement d'un niveau (jouer, rembobiner, rejouer avec le clone)
 
-## 7. Conclusion
+## 6. Conclusion
 
 > _Bilan : apports du pattern, limites rencontrées, pistes d'amélioration._
 
