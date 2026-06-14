@@ -51,13 +51,25 @@ Le pattern Commande est particulièrement utile pour enregistrer les actions du 
 
 ## 5. Déploiement
 
-Pour commencer à développer ou compiler une version du projet, commencez par cloner le repository sur votre machine.
+### 5.1 Jouer à une version précompilée
 
-Afin de compiler ou travailler sur le projet, nous conseillons d'installer [Unity Hub](https://docs.unity.com/en-us/hub/install-hub). Vous pourrez ensuite ouvrir le dossier racine du projet avec Unity Hub, qui vous proposera d'installer automatiquement la version de Unity compatible. Ce projet utilise Unity 6 et plus spécifiquement la version `6000.4.6f1`.
+Le moyen le plus simple d'essayer le jeu est de télécharger une version précompilée. Des binaires pour Windows et Linux (x86-64) sont disponibles dans la section [releases](https://github.com/Xenogix/PlatformerMCR/releases) du dépôt. Il suffit de télécharger l'archive correspondant à votre plateforme, de l'extraire, puis de lancer l'exécutable.
 
-L'éditeur de Unity offre la possibilité de compiler le projet pour diverses plateformes, qui vous seront proposées avant l'installation. Vous pourrez ensuite compiler le projet via le menu `File` -> `Build and Run`. Choisissez ensuite la destination de la compilation. Par exemple dans un dossier `Build` que vous aurez ajouté à la racine du projet et qui sera ignoré par git.
+### 5.2 Ouvrir le projet pour le développement
 
-Des versions précompilées pour Windows et Linux (x86-64) peuvent être trouvée dans la section [releases](https://github.com/Xenogix/PlatformerMCR/releases).
+Pour développer ou compiler le projet vous-même :
+
+1. **Cloner le dépôt** sur votre machine.
+2. **Installer [Unity Hub](https://docs.unity.com/en-us/hub/install-hub)**, qui gère les versions de l'éditeur Unity.
+3. **Ouvrir le dossier racine du projet** depuis Unity Hub. Celui-ci détectera la version de Unity requise et vous proposera de l'installer automatiquement. Ce projet utilise **Unity 6**, version `6000.4.6f1`.
+
+### 5.3 Compiler le projet
+
+Une fois le projet ouvert dans l'éditeur Unity :
+
+1. Allez dans `File` -> `Build and Run`.
+2. Sélectionnez la plateforme cible (les plateformes disponibles dépendent des modules installés avec Unity).
+3. Choisissez le dossier de destination de la compilation. Nous recommandons un dossier `Builds/` à la racine du projet. Ce dossier est déjà ignoré par git.
 
 ## 6. Utilisation
 
