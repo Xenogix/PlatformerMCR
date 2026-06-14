@@ -38,7 +38,14 @@
 
 > _Diagramme de classes de l'implémentation (au minimum les classes liées au pattern)._
 
-_(insérer le diagramme ici)_
+### 4.1 Aperçu global
+![Aperçu global](rapport/diagrams/system-overview.svg)
+
+### 4.2 Diagramme d'implémentation du pattern Command
+![Implémentaiton du pattern Command](rapport/diagrams/command.png)
+
+### 4.3 Diagramme d'implémentation du pattern Memento
+![Implémentation du pattern Memento](rapport/diagrams/memento.svg)
 
 ## 5. Déploiement
 
