@@ -4,12 +4,14 @@
 
 ## 1. Contexte et présentation du projet
 
-> _Décrire le jeu : le concept (plateforme + rewind temporel + clones qui rejouent les
-> actions passées), le but du joueur, et en quoi cette idée met en valeur le pattern Command._
+Notre jeu propose de traverser des niveaux comme dans un Plateformer classique, avec un twist ; le joueur peut remonter dans le temps à volonté, laissant derrière lui un écho qui tente d'imiter ses actions. Le joueur doit donc composer avec plusieurs timelines pour résoudre de petites énigmes, et le chaos d'une multitude de clones se marchant dessus...
 
-- Concept et boucle de jeu
+Les niveaux défilent en boucle, le joueur entrant en compétition avec l'ombre de sa meilleure performance enregistrée dès qu'il revisite un niveau. Il peut optimiser le temps réel de traversée, mais aussi le temps subjectif de ses clones.
+
+Le pattern Commande est particulièrement utile pour enregistrer les actions du joueur 
+ et les rejouer sur ses clones. 
+
 - Captures d'écran / aperçu
-- Lien avec le modèle choisi
 
 ## 2. Le modèle Command
 
