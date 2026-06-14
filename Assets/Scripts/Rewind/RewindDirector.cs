@@ -191,6 +191,7 @@ public sealed class RewindDirector : MonoBehaviour
         // the re-record append a second one — two frames at one tick, which the timeline's binary search
         // then reads inconsistently (the source of stray clone inputs). Mirror of ConfirmClone's split.
         livePlayer.Timeline.TruncateAfterTick(target - 1);
+        livePlayer.RewindResync(target); // restore the carried move/jump-held intent at the seam (no spurious stop)
         Resume();
     }
 
@@ -207,6 +208,7 @@ public sealed class RewindDirector : MonoBehaviour
         // live player keeps [.., target-1] and re-records forward from target.
         CommandTimeline echoScript = livePlayer.Timeline.SliceFromTick(target);
         livePlayer.Timeline.TruncateAfterTick(target - 1);
+        livePlayer.RewindResync(target); // restore the carried move/jump-held intent at the seam (no spurious stop)
 
         // One colour per clone, shared by its timeline lane and its echo's albedo.
         Color color = CloneColorFor(clones.Count);

@@ -33,7 +33,7 @@ public class PlayerCommandInvoker : MonoBehaviour, ITickable
     private Vector2 lastMove;
     private bool lastJumpHeld;
     private bool hasRecorded;
-    private int lastRecordedTick = int.MinValue; // last tick handed to Tick(); a smaller one next = a rewind
+    private readonly List<ICommand> _resync = new(); // scratch list for re-seeding sticky state on a rewind
 
     private Action<InputAction.CallbackContext> onJumpStarted;
     private Action<InputAction.CallbackContext> onUseStarted;
@@ -75,14 +75,6 @@ public class PlayerCommandInvoker : MonoBehaviour, ITickable
 
     public void Tick(int tick, float dt)
     {
-        // A rewind winds the clock back to an earlier tick. Re-establish the sticky state (move /
-        // jump-held) FRESH on that tick instead of diffing it against the now-stale pre-rewind values:
-        // otherwise an input that merely looks unchanged is suppressed, and the re-recorded timeline
-        // carries the OLD sticky value forward — so a clone later sliced from here replays the wrong
-        // movement (the "echo history bleed"). Mirrors PlayerController's own rewind detection.
-        if (tick < lastRecordedTick) hasRecorded = false;
-        lastRecordedTick = tick;
-
         Vector2 move = moveAction != null ? moveAction.ReadValue<Vector2>() : Vector2.zero;
         bool jumpHeld = jumpAction != null && jumpAction.IsPressed();
 
@@ -109,5 +101,27 @@ public class PlayerCommandInvoker : MonoBehaviour, ITickable
             foreach (ICommand cmd in changed) cmd.Execute(player);
         controller.Tick(tick, dt);
         Timeline.Record(tick, changed);
+    }
+
+    /// <summary>After a rewind lands on `tick`, restore the player's carried input INTENT (move /
+    /// jump-held) from the recording — the same sticky state SliceFromTick re-establishes for a clone —
+    /// so the live player resumes mid-stride and the recorder's change-detection baseline matches.
+    /// Without it the controller keeps its pre-rewind (now-stale) direction and the next recorded frame
+    /// is a spurious stop, which a clone sliced from here then replays.</summary>
+    public void RewindResync(int tick)
+    {
+        // Base sticky state (idle), then apply whatever the recording carries into `tick`.
+        lastMove = Vector2.zero; lastJumpHeld = false;
+        player.Move(Vector2.zero); player.SetJumpHeld(false);
+
+        _resync.Clear();
+        Timeline.CarriedStickyAt(tick, _resync);
+        foreach (ICommand c in _resync)
+        {
+            c.Execute(player);
+            if (c is MoveCommand m) lastMove = m.Direction;
+            else if (c is JumpHeldCommand j) lastJumpHeld = j.Held;
+        }
+        hasRecorded = true;
     }
 }
