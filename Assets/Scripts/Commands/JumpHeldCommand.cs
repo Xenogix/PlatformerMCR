@@ -8,6 +8,9 @@ public class JumpHeldCommand : IStickyCommand
 {
     private readonly bool held;
 
+    /// <summary>The carried held-state — read when re-seeding the live player at a rewind seam.</summary>
+    public bool Held => held;
+
     public JumpHeldCommand(bool held) => this.held = held;
 
     public void Execute(Player target) => target.SetJumpHeld(held);

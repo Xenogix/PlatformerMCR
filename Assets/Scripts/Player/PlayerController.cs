@@ -10,6 +10,8 @@ public class PlayerController : MonoBehaviour
     [SerializeField] private float moveSpeed = 8f;
     [SerializeField] private float acceleration = 50f;
     [SerializeField] private float deceleration = 35f;
+    [Tooltip("Gentle ground-only bleed of speed above moveSpeed back toward it. 0 = keep all momentum (air always conserves).")]
+    [SerializeField] private float groundOverspeedDeceleration = 8f;
 
     [Header("Jump")]
     [SerializeField] private float jumpForce = 12f;
@@ -86,6 +88,7 @@ public class PlayerController : MonoBehaviour
     public bool IsJumping => !IsOnGround && rb.linearVelocity.y > 0f;
     public Vector2 Velocity => rb != null ? rb.linearVelocity : Vector2.zero;
     public float MoveSpeed => moveSpeed;
+    public float Speed { get; private set; } // planar speed under the player's OWN power (excludes carrier / jump verticals); set in ApplyHorizontal
 
     // Reusable ground-check buffer. A List (not a fixed array) so it grows to hold every hit instead
     // of silently truncating. Shared statically: queries run on the main thread, consumed synchronously.
@@ -221,10 +224,11 @@ public class PlayerController : MonoBehaviour
 
     private Vector2 ApplyHorizontal(Vector2 velocity, float dt)
     {
-        float rate = Mathf.Abs(direction.x) > 0f ? acceleration : deceleration;
-
+        float rate;
         if (IsOnGround)
         {
+            rate = Mathf.Abs(direction.x) > 0f ? acceleration : deceleration;
+
             // Work RELATIVE to the ground velocity, then add it back: on a moving carrier the idle
             // target is the carrier's own speed, so we're carried on both axes; on static ground it's
             // zero. The tangent follows the surface so we walk up/down slopes without sliding.
@@ -232,15 +236,29 @@ public class PlayerController : MonoBehaviour
             // Measure our own speed against LAST tick's base velocity, not this tick's, so a carrier
             // that is itself accelerating isn't absorbed into the resistance → we track it rigidly
             // (snappy carry) instead of friction-lagging up to its speed. Add the CURRENT base vel back.
-            float relCurrent = Vector2.Dot(velocity - prevBaseVelocity, tangent);
-            float relTarget = direction.x * moveSpeed;
-            float relNew = Mathf.MoveTowards(relCurrent, relTarget, rate * dt);
-            return baseVelocity + tangent * relNew;
+            float relativeCurrent = Vector2.Dot(velocity - prevBaseVelocity, tangent);
+            float relativeNew = ResolveSpeed(relativeCurrent, direction.x * moveSpeed, rate, dt, groundOverspeedDeceleration);
+            Speed = Mathf.Abs(relativeNew); // own tangential speed — high when bombing down a slope
+            return baseVelocity + tangent * relativeNew;
         }
 
+        rate = Mathf.Abs(direction.x) > 0f ? acceleration : deceleration;
         // Airborne: air-control the horizontal, preserve vertical for the jump/fall arc.
-        float newX = Mathf.MoveTowards(velocity.x, direction.x * moveSpeed, rate * dt);
+        float newX = ResolveSpeed(velocity.x, direction.x * moveSpeed, rate, dt, overspeedBleed: 0f);
+        Speed = Mathf.Abs(newX); // own horizontal speed — a straight-up jump won't tighten the camera
         return new Vector2(newX, velocity.y);
+    }
+
+    // Moves cur toward target at rate. When we're already moving FASTER than the input target in that
+    // same direction, we don't brake at the full rate — we bleed down at overspeedBleed instead, so
+    // earned momentum (off a fast platform, a run boost) is kept (bleed 0) or shed gently (small bleed).
+    // No input → target 0 → normal decel to a stop; opposite input → target flips sign → brake/turn.
+    private static float ResolveSpeed(float cur, float target, float rate, float dt, float overspeedBleed)
+    {
+        bool drivingSameWay = cur * target > 0f;                               // input held AND moving that way
+        if (drivingSameWay && Mathf.Abs(cur) > Mathf.Abs(target))
+            return Mathf.MoveTowards(cur, target, overspeedBleed * dt);        // gentle decay (0 = full conserve)
+        return Mathf.MoveTowards(cur, target, rate * dt);
     }
 
     private Vector2 ApplyGravity(Vector2 velocity, float dt)

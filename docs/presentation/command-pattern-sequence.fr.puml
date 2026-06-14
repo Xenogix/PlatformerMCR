@@ -1,0 +1,77 @@
+@startuml command-pattern-sequence-fr
+title Un enregistrement, deux invocateurs — tick direct, découpe de clone, tick de rejeu
+
+skinparam shadowing false
+skinparam defaultFontName sans-serif
+skinparam sequenceMessageAlign center
+hide footbox
+autonumber "<b>[00]"
+
+box "Temps" #F4F4F4
+  participant GameClock as clock
+end box
+box "Direct — enregistrement" #EAF2FB
+  participant "PlayerCommandInvoker\n(invocateur, direct)" as invoker
+  participant "cmd : ICommand\n(une instance — réutilisée)" as cmd
+  participant "live : Player\n(récepteur)" as live
+  participant "Timeline :\nCommandTimeline" as timeline
+end box
+participant RewindDirector as director
+box "Rejeu — clone" #EBF7EC
+  participant "ClonePlayback\n(invocateur, rejeu)" as playback
+  participant "clone : Player\n(récepteur)" as clone
+end box
+
+== Jeu en direct — à chaque tick fixe t ==
+clock -> invoker : Tick(t, dt)
+activate invoker
+invoker -> invoker : lit l'input,\ncompare au tick précédent
+opt l'input a changé ce tick
+    invoker -> cmd : « crée » MoveCommand(dir) / JumpCommand() / …
+    invoker -> cmd : Execute(live)
+    activate cmd
+    cmd -> live : Move(dir) / Jump() / Use()
+    deactivate cmd
+end
+invoker -> live : controller.Tick(t, dt)  — physique
+invoker -> timeline : Record(t, changed)
+note right of timeline
+  **sparse** : un TickRecord n'est ajouté
+  qu'au changement d'input ; sinon
+  l'état sticky est reconduit.
+end note
+deactivate invoker
+
+== Le joueur confirme une découpe de clone au tick T ==
+director -> timeline : SliceFromTick(T)
+timeline --> director : copie figée [T..fin],\nétat sticky ré-établi en T
+director -> timeline : TruncateAfterTick(T-1)
+note right of timeline : le joueur direct ré-enregistre\nen avant depuis T
+director -> playback : instancie l'écho, Play(tranche)
+
+== Rejeu — à chaque tick fixe t (même horloge) ==
+clock -> playback : Tick(t, dt)
+activate playback
+playback -> timeline : GetAtTick(t)
+alt un enregistrement existe en t
+    playback -> cmd : Execute(clone)
+    note right of cmd : la **même instance de commande**\nqui a piloté le joueur en direct —\nseul le récepteur change
+    cmd -> clone : Move(dir) / Jump() / Use()
+else rien n'a changé en t
+    playback -> playback : reconduit l'état sticky
+end
+playback -> clone : controller.Tick(t, dt)  — physique
+opt t > timeline.LastTick
+    playback -> playback : retire l'écho
+end
+deactivate playback
+
+legend left
+  |= notation |= signification |
+  | « crée » | objet commande construit ce tick |
+  | flèche pleine | appel synchrone |
+  | flèche pointillée | valeur de retour |
+  | sticky | dernière valeur reconduite jusqu'au changement |
+endlegend
+
+@enduml

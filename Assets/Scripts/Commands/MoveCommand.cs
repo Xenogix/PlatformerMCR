@@ -9,6 +9,9 @@ public class MoveCommand : IStickyCommand
 {
     private readonly Vector2 direction;
 
+    /// <summary>The carried direction — read when re-seeding the live player at a rewind seam.</summary>
+    public Vector2 Direction => direction;
+
     public MoveCommand(Vector2 direction) => this.direction = direction;
 
     public void Execute(Player target) => target.Move(direction);

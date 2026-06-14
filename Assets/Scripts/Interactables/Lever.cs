@@ -1,28 +1,61 @@
+using System.Collections.Generic;
 using UnityEngine;
-using UnityEngine.Events;
 
-public class Lever : MonoBehaviour, IInteractable
+// A lever the player (or a replaying clone) flips. It IS a Toggleable — its own on/off state is captured
+// for rewind by a ToggleableChannel like any other object — and flipping it cascades to its target
+// Toggleables: doors, spikes, even other levers. Direct references, no UnityEvent wiring.
+public sealed class Lever : Toggleable, IInteractable
 {
-    public UnityEvent On;
+    [Tooltip("What this lever flips when used. Doors, spike hazards — even other levers.")]
+    [SerializeField] private Toggleable[] targets;
 
-    public UnityEvent Off;
+    [Tooltip("Transform flipped 180° about its local Y while the lever is on. Defaults to this object's transform.")]
+    [SerializeField] private Transform pivot;
 
-    private bool isOn = false;
+    private Quaternion baseRotation; // the 'off' handle pose, captured before the first ApplyState
+    private bool pivotReady;
 
-    /// <summary>Current state, captured by <see cref="LeverChannel"/>.</summary>
-    public bool IsOn => isOn;
+    // Re-entrancy guard: a lever may target another lever, so a cycle (A→B→A) would recurse forever.
+    // One shared set is fine — a cascade runs synchronously within a single tick.
+    private static readonly HashSet<Lever> cascading = new();
 
-    public void Interact()
+    protected override void Awake()
     {
-        isOn = !isOn;
-
-        if (isOn)
-            On.Invoke();
-        else
-            Off.Invoke();
+        EnsurePivot();
+        base.Awake(); // sets IsActive = startActive and calls ApplyState (the handle pose)
     }
 
-    // Rewind restore: set the state WITHOUT firing events — the wired targets (doors)
-    // are restored by their own channels, so re-firing would double-drive them.
-    public void RestoreState(bool on) => isOn = on;
+    // Player / clone interaction: flip ourselves AND drive our targets.
+    public void Interact() => Toggle();
+
+    public override void Toggle()
+    {
+        if (!cascading.Add(this)) return;       // already flipped in this cascade → cycle: stop
+        bool root = cascading.Count == 1;
+        try
+        {
+            base.Toggle();                      // flip own state + handle (ApplyState) — NO cascade
+            if (targets != null)
+                foreach (Toggleable t in targets)
+                    if (t != null) t.Toggle();  // a door/spike just flips; another lever cascades on
+        }
+        finally { if (root) cascading.Clear(); }
+    }
+
+    // Own effect only — rotate the handle to match state. Called by SetActive too (incl. rewind restore),
+    // so it must NOT cascade: the targets restore themselves via their own channels. Anchoring to
+    // baseRotation keeps the pose exact (no drift) and lets a rewind snap straight to it.
+    protected override void ApplyState(bool active)
+    {
+        EnsurePivot();
+        pivot.localRotation = baseRotation * Quaternion.Euler(0f, active ? 180f : 0f, 0f);
+    }
+
+    private void EnsurePivot()
+    {
+        if (pivotReady) return;
+        if (pivot == null) pivot = transform;
+        baseRotation = pivot.localRotation;
+        pivotReady = true;
+    }
 }

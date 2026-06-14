@@ -106,6 +106,18 @@ public class CommandTimeline
         return copy;
     }
 
+    /// <summary>The latest sticky command of each kind carried INTO `tick` (the carry-forward state at
+    /// that tick), appended to `into`. Same backward scan SliceFromTick uses for a clone's openers — used
+    /// to re-seed the LIVE player's intent when a rewind lands on `tick`.</summary>
+    public void CarriedStickyAt(int tick, List<ICommand> into)
+    {
+        var openers = new Dictionary<Type, ICommand>();
+        for (int i = 0; i < frames.Count && frames[i].Tick <= tick; i++)
+            foreach (var c in frames[i].Commands)
+                if (c is IStickyCommand) openers[c.GetType()] = c;
+        foreach (var kv in openers) into.Add(kv.Value);
+    }
+
     /// <summary>Keep change-records with Tick &lt;= tick; set the recording end to tick so the
     /// live player re-records forward from tick+1.</summary>
     public void TruncateAfterTick(int tick)

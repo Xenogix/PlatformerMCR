@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using UnityEngine;
 
 // Dense channel for a physics-driven body: position, rotation, and BOTH velocities.
@@ -41,5 +42,17 @@ public sealed class RigidbodyChannel : RewindChannel<RigidbodyState>
 
         transform.position = new Vector3(s.Position.x, s.Position.y, transform.position.z);
         transform.rotation = Quaternion.Euler(0f, 0f, s.Rotation);
+    }
+
+    /// Export the recorded path as positions, one per capture tick from spawnTick (the first
+    /// captured tick). Assumes per-tick capture (captureRate 1). False if nothing was captured.
+    public bool TryExportPositions(out int spawnTick, out List<Vector2> positions)
+    {
+        spawnTick = 0; positions = null;
+        if (History is not DenseHistory<RigidbodyState> dense || dense.Count == 0) return false;
+        spawnTick = dense.BaseTick;
+        positions = new List<Vector2>(dense.Count);
+        for (int i = 0; i < dense.Count; i++) positions.Add(dense.ValueAt(i).Position);
+        return true;
     }
 }

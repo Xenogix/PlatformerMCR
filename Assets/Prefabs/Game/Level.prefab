@@ -11,6 +11,7 @@ GameObject:
   - component: {fileID: 7439697881815893936}
   - component: {fileID: 1737825940658008514}
   - component: {fileID: 7478290318524836249}
+  - component: {fileID: 3282278279780441605}
   m_Layer: 0
   m_Name: Level
   m_TagString: Untagged
@@ -67,6 +68,20 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::LevelTransition
   noiseObject: {fileID: 4618154968309147772}
   staticDuration: 0.2
+  resultHoldDuration: 2
+--- !u!114 &3282278279780441605
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 6076355441991113952}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: dd843e92857b27d56bb48440bacbe7ca, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::ShadowDirector
+  shadowPrefab: {fileID: 3550139912839512445, guid: ea05442f75baf65fb8c35aa6fb980141, type: 3}
 --- !u!1001 &3036124520113393522
 PrefabInstance:
   m_ObjectHideFlags: 0

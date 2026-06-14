@@ -33,6 +33,7 @@ public class PlayerCommandInvoker : MonoBehaviour, ITickable
     private Vector2 lastMove;
     private bool lastJumpHeld;
     private bool hasRecorded;
+    private readonly List<ICommand> _resync = new(); // scratch list for re-seeding sticky state on a rewind
 
     private Action<InputAction.CallbackContext> onJumpStarted;
     private Action<InputAction.CallbackContext> onUseStarted;
@@ -85,6 +86,11 @@ public class PlayerCommandInvoker : MonoBehaviour, ITickable
             (changed ??= new List<ICommand>()).Add(new JumpHeldCommand(jumpHeld));
         if (jumpPressedThisTick) (changed ??= new List<ICommand>()).Add(new JumpCommand());
         if (usePressedThisTick) (changed ??= new List<ICommand>()).Add(new UseCommand());
+        // Consume the discrete presses NOW, before executing — if a command throws (e.g. a misconfigured
+        // interactable) the press must not stay latched and re-fire every tick after the throw skips the
+        // tail of this method.
+        jumpPressedThisTick = false;
+        usePressedThisTick = false;
 
         lastMove = move;
         lastJumpHeld = jumpHeld;
@@ -95,8 +101,27 @@ public class PlayerCommandInvoker : MonoBehaviour, ITickable
             foreach (ICommand cmd in changed) cmd.Execute(player);
         controller.Tick(tick, dt);
         Timeline.Record(tick, changed);
+    }
 
-        jumpPressedThisTick = false;
-        usePressedThisTick = false;
+    /// <summary>After a rewind lands on `tick`, restore the player's carried input INTENT (move /
+    /// jump-held) from the recording — the same sticky state SliceFromTick re-establishes for a clone —
+    /// so the live player resumes mid-stride and the recorder's change-detection baseline matches.
+    /// Without it the controller keeps its pre-rewind (now-stale) direction and the next recorded frame
+    /// is a spurious stop, which a clone sliced from here then replays.</summary>
+    public void RewindResync(int tick)
+    {
+        // Base sticky state (idle), then apply whatever the recording carries into `tick`.
+        lastMove = Vector2.zero; lastJumpHeld = false;
+        player.Move(Vector2.zero); player.SetJumpHeld(false);
+
+        _resync.Clear();
+        Timeline.CarriedStickyAt(tick, _resync);
+        foreach (ICommand c in _resync)
+        {
+            c.Execute(player);
+            if (c is MoveCommand m) lastMove = m.Direction;
+            else if (c is JumpHeldCommand j) lastJumpHeld = j.Held;
+        }
+        hasRecorded = true;
     }
 }

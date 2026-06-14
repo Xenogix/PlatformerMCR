@@ -46,7 +46,7 @@ public sealed class RewindDirector : MonoBehaviour
     private int scrubTick;
     private float scrubHeldTime;    // how long the scrub direction has been held (drives acceleration)
     private int playerLane = -1;    // Player's timeline lane
-    private int echoSeq;
+    private readonly EchoSpawner echoSpawner = new(); // instantiates + seeds echoes (see EchoSpawner)
 
     // One per clone: its timeline lane and the absolute-tick window it acts over ([spawn, end]),
     // used to colour that lane's "life" slice when the timeline is opened.
@@ -186,8 +186,12 @@ public sealed class RewindDirector : MonoBehaviour
         int target = caretaker.Commit(scrubTick);
         if (target < 0) { CancelScrub(); return; }
 
-        // The live player keeps only [.., target] and re-records forward from target+1.
-        livePlayer.Timeline.TruncateAfterTick(target);
+        // Keep commands [.., target-1]; the clock resumed AT `target`, so the player re-runs that tick
+        // and re-records it. Truncating to `target` would keep the old change-frame at `target` AND let
+        // the re-record append a second one — two frames at one tick, which the timeline's binary search
+        // then reads inconsistently (the source of stray clone inputs). Mirror of ConfirmClone's split.
+        livePlayer.Timeline.TruncateAfterTick(target - 1);
+        livePlayer.RewindResync(target); // restore the carried move/jump-held intent at the seam (no spurious stop)
         Resume();
     }
 
@@ -204,10 +208,11 @@ public sealed class RewindDirector : MonoBehaviour
         // live player keeps [.., target-1] and re-records forward from target.
         CommandTimeline echoScript = livePlayer.Timeline.SliceFromTick(target);
         livePlayer.Timeline.TruncateAfterTick(target - 1);
+        livePlayer.RewindResync(target); // restore the carried move/jump-held intent at the seam (no spurious stop)
 
         // One colour per clone, shared by its timeline lane and its echo's albedo.
         Color color = CloneColorFor(clones.Count);
-        SpawnEcho(echoScript, target, color);
+        echoSpawner.Spawn(echoPrefab, livePlayer.gameObject, echoScript, target, color);
 
         // Remember the clone's life window [target, present] so its lane is coloured over exactly
         // that slice next time the timeline opens.
@@ -237,71 +242,5 @@ public sealed class RewindDirector : MonoBehaviour
     {
         float hue = (index * 0.61803398875f) % 1f;
         return Color.HSVToRGB(hue, cloneColorSaturation, cloneColorValue);
-    }
-
-    private void SpawnEcho(CommandTimeline script, int spawnTick, Color color)
-    {
-        if (echoPrefab == null)
-        {
-            Debug.LogError("RewindDirector: echoPrefab is not assigned — cannot spawn an echo.");
-            return;
-        }
-
-        GameObject src = livePlayer.gameObject;
-        var srcRb = src.GetComponent<Rigidbody2D>();
-
-        // Seed from the Rigidbody2D, NOT the Transform: right after a rewind the rigidbody holds
-        // the restored state@target, but the transform doesn't sync until the next physics tick.
-        Vector2 seedPos = srcRb != null ? srcRb.position : (Vector2)src.transform.position;
-        float seedRot = srcRb != null ? srcRb.rotation : src.transform.eulerAngles.z;
-
-        GameObject echo = Instantiate(echoPrefab,
-            new Vector3(seedPos.x, seedPos.y, src.transform.position.z),
-            Quaternion.Euler(0f, 0f, seedRot));
-        echo.name = $"Echo#{++echoSeq}";
-
-        // Tint this echo with its clone colour (same one used for its timeline lane) via a
-        // MaterialPropertyBlock — a per-renderer override, so NO unique material instance is
-        // created (mr.material would, and that instance leaks when the echo is later reclaimed).
-        // Keep the shared material's alpha so a translucent echo stays translucent.
-        var mr = echo.GetComponentInChildren<MeshRenderer>();
-        if (mr != null)
-        {
-            Material shared = mr.sharedMaterial;
-            bool urp = shared != null && shared.HasProperty("_BaseColor");
-            float alpha = shared == null ? 1f : (urp ? shared.GetColor("_BaseColor").a : shared.color.a);
-
-            var mpb = new MaterialPropertyBlock();
-            mr.GetPropertyBlock(mpb);
-            mpb.SetColor(urp ? "_BaseColor" : "_Color", new Color(color.r, color.g, color.b, alpha));
-            mr.SetPropertyBlock(mpb);
-        }
-
-        // Seed the echo from the player's restored state@target: position, rotation, and velocity.
-        var echoRb = echo.GetComponent<Rigidbody2D>();
-        if (srcRb != null && echoRb != null)
-        {
-            echoRb.position = seedPos;
-            echoRb.rotation = seedRot;
-            echoRb.linearVelocity = srcRb.linearVelocity;
-            echoRb.angularVelocity = srcRb.angularVelocity;
-        }
-
-        // The echo spawns deep inside the player (and maybe other echoes). Sync transforms so the
-        // seeded pose is visible to physics queries; PlayerController.ResolveCharacterOverlaps then
-        // suppresses those deep overlaps each tick (before the solver steps) until they separate.
-        Physics2D.SyncTransforms();
-
-        echo.GetComponent<ClonePlayback>().Play(script);
-
-        // Register + capture NOW at spawnTick (a capture-cadence tick) so the echo has an
-        // alive record from the moment it exists — otherwise an immediate second rewind to
-        // spawnTick would find no record and deactivate the fresh echo.
-        var echoEntity = echo.GetComponent<RewindableEntity>();
-        if (echoEntity != null)
-        {
-            RewindCaretaker.Instance.Register(echoEntity);
-            echoEntity.Capture(spawnTick);
-        }
     }
 }

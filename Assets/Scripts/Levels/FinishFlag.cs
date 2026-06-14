@@ -19,6 +19,10 @@ public class FinishFlag : MonoBehaviour
         if (other.GetComponentInParent<Player>() == null) return;
         hasTriggered = true;
 
+        // Persist this run as a best-run shadow BEFORE the transition unloads the scene
+        // (the player + every clone are still alive here, with their full captured paths).
+        BestRunRecorder.RecordIfBest();
+
         // Route through the level transition (static "channel change" outro) if present;
         // otherwise fall back to loading the next level directly.
         var transition = FindAnyObjectByType<LevelTransition>();
