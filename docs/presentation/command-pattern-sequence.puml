@@ -1,0 +1,54 @@
+@startuml command-pattern-sequence
+title One recording, two invokers — live tick, clone split, replay tick
+
+skinparam shadowing false
+skinparam defaultFontName sans-serif
+
+participant GameClock as clock
+participant "PlayerCommandInvoker\n(invoker, live)" as invoker
+participant "cmd : ICommand" as cmd
+participant "live : Player\n(receiver)" as live
+participant "Timeline :\nCommandTimeline" as timeline
+participant RewindDirector as director
+participant "ClonePlayback\n(invoker, replay)" as playback
+participant "clone : Player\n(receiver)" as clone
+
+== Live play — every fixed tick t ==
+clock -> invoker : Tick(t, dt)
+invoker -> invoker : read input,\ndiff vs last tick
+opt something changed this tick
+    invoker -> cmd : «create» MoveCommand(dir) / JumpCommand() / ...
+    invoker -> cmd : Execute(live)
+    cmd -> live : Move(dir) / Jump() / Use()
+end
+invoker -> live : controller.Tick(t, dt)  — physics
+invoker -> timeline : Record(t, changed)
+note right of timeline
+    Sparse: a TickRecord is appended
+    only when input changed;
+    sticky state carries forward.
+end note
+
+== Player confirms a clone split at scrub tick T ==
+director -> timeline : SliceFromTick(T)
+timeline --> director : frozen [T..end] copy,\nsticky openers re-established at T
+director -> timeline : TruncateAfterTick(T-1)
+note right : live player re-records\nforward from T
+director -> playback : spawn echo, Play(slice)
+
+== Replay — every fixed tick t (same clock) ==
+clock -> playback : Tick(t, dt)
+playback -> timeline : GetAtTick(t)
+alt record exists at t
+    playback -> cmd : Execute(clone)
+    note right of cmd : the **same command instance**\nthat drove the live player
+    cmd -> clone : Move(dir) / Jump() / Use()
+else nothing changed at t
+    playback -> playback : carry sticky state forward
+end
+playback -> clone : controller.Tick(t, dt)  — physics
+opt t > timeline.LastTick
+    playback -> playback : retire echo
+end
+
+@enduml

@@ -1,0 +1,54 @@
+@startuml command-pattern-sequence-fr
+title Un enregistrement, deux invocateurs — tick direct, découpe de clone, tick de rejeu
+
+skinparam shadowing false
+skinparam defaultFontName sans-serif
+
+participant GameClock as clock
+participant "PlayerCommandInvoker\n(invocateur, direct)" as invoker
+participant "cmd : ICommand" as cmd
+participant "live : Player\n(récepteur)" as live
+participant "Timeline :\nCommandTimeline" as timeline
+participant RewindDirector as director
+participant "ClonePlayback\n(invocateur, rejeu)" as playback
+participant "clone : Player\n(récepteur)" as clone
+
+== Jeu en direct — à chaque tick fixe t ==
+clock -> invoker : Tick(t, dt)
+invoker -> invoker : lit l'input,\ncompare au tick précédent
+opt quelque chose a changé ce tick
+    invoker -> cmd : « crée » MoveCommand(dir) / JumpCommand() / ...
+    invoker -> cmd : Execute(live)
+    cmd -> live : Move(dir) / Jump() / Use()
+end
+invoker -> live : controller.Tick(t, dt)  — physique
+invoker -> timeline : Record(t, changed)
+note right of timeline
+    Journal creux : un TickRecord
+    n'est ajouté qu'au changement
+    d'input ; l'état sticky est reconduit.
+end note
+
+== Le joueur confirme une découpe de clone au tick T ==
+director -> timeline : SliceFromTick(T)
+timeline --> director : copie figée [T..fin],\nétat sticky ré-établi en T
+director -> timeline : TruncateAfterTick(T-1)
+note right : le joueur direct ré-enregistre\nen avant depuis T
+director -> playback : instancie l'écho, Play(tranche)
+
+== Rejeu — à chaque tick fixe t (même horloge) ==
+clock -> playback : Tick(t, dt)
+playback -> timeline : GetAtTick(t)
+alt un enregistrement existe en t
+    playback -> cmd : Execute(clone)
+    note right of cmd : la **même instance de commande**\nqui a piloté le joueur en direct
+    cmd -> clone : Move(dir) / Jump() / Use()
+else rien n'a changé en t
+    playback -> playback : reconduit l'état sticky
+end
+playback -> clone : controller.Tick(t, dt)  — physique
+opt t > timeline.LastTick
+    playback -> playback : retire l'écho
+end
+
+@enduml
