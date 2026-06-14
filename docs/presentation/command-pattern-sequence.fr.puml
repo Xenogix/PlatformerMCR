@@ -36,7 +36,7 @@ end
 invoker -> live : controller.Tick(t, dt)  — physique
 invoker -> timeline : Record(t, changed)
 note right of timeline
-  **Creux** : un TickRecord n'est ajouté
+  **sparse** : un TickRecord n'est ajouté
   qu'au changement d'input ; sinon
   l'état sticky est reconduit.
 end note
