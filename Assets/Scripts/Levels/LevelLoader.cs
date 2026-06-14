@@ -33,7 +33,12 @@ public static class LevelLoader
         return scene.LoadSceneAsync(LoadSceneMode.Single);
     }
 
-    public static void LoadNext() => Load(Index + 1);
+    // Loop the roster: after the last level, wrap back to the first (…→09→01).
+    public static void LoadNext()
+    {
+        int count = Set != null ? Set.Scenes.Count : 0;
+        Load(count > 0 ? (Index + 1) % count : Index + 1);
+    }
     public static void Restart() => Load(Index);
     public static void SetIndex(int index) => Index = index;
 }
