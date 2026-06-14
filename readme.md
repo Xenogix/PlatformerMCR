@@ -105,11 +105,7 @@ Deux choix de conception portent le pattern :
 
 #### Mouvement & physique du joueur
 
-`PlayerController` gère tout le mouvement avec une gravité custom (`gravityScale = 0`, gravité appliquée dans le code) pour garder le ressenti du saut réglable. Les timings (buffer de saut, *coyote time*) sont stockés en ticks absolus, donc un tick en arrière les invalide (pas de saut fantôme après un rewind). `PlayerController` applique une vélocité calculée selon notre logique interne à chaque tick.
-
-#### Interactables — `Toggleable` rewindable générique
-
-Un seul composant `Toggleable` (`startActive` / `SetActive` / `Toggle`) modélise les portes et autres obstacles désactivables par un levier. Un `Lever` inverse l'état activé/désactivé de ses cibles. Chaque toggleable porte son propre `RewindableEntity` + `ToggleableChannel`.
+`PlayerController` est le *receiver* concret du mouvement : c'est lui que `Player` appelle quand une commande s'exécute. Il s'appuie sur une gravité maison (`gravityScale = 0`, tout est calculé dans le code) pour garder un saut bien réglable, et pose directement la vélocité du corps à chaque tick — le moteur physique ne fait plus que résoudre les collisions. Les fenêtres de tolérance du saut, comme le buffer d'entrée et le *coyote time*, sont enregistrées en ticks absolus : dès qu'on rembobine d'un tick, elles redeviennent caduques, ce qui évite les sauts fantômes après un retour en arrière. Enfin, le déplacement se calcule relativement à la vélocité de la surface sur laquelle on se tient (`baseVelocity`), si bien que le joueur comme ses échos se laissent porter naturellement par les plateformes mobiles et même par les autres clones.
 
 ## 4. Diagramme de classes
 
