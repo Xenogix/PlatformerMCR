@@ -133,10 +133,25 @@ Une fois le projet ouvert dans l'éditeur Unity :
 
 ## 5. Utilisation
 
-> _Comment jouer / utiliser l'application._
+**Contrôles**
 
-- Contrôles
-- Déroulement d'un niveau (jouer, rembobiner, rejouer avec le clone)
+| Touche | Action |
+|--------|--------|
+| **WASD** / **← →** | Se déplacer |
+| **Espace** | Sauter |
+| **E** | Interagir (leviers) |
+| **Tab** | Ouvrir la timeline de rembobinage |
+
+Une fois la timeline ouverte :
+
+| Touche | Action |
+|--------|--------|
+| **← →** | Parcourir le temps (*scrub*) |
+| **Espace** | Laisser un clone et reprendre le jeu |
+| **Tab** | Confirmer le rembobinage (sans clone) |
+| **Échap** | Annuler |
+
+**Déroulement d'un niveau.** On joue normalement jusqu'à un blocage, on ouvre la timeline (**Tab**), on recule dans le temps (**← →**), puis on laisse un clone (**Espace**) qui rejouera nos actions passées — à empiler autant de fois que nécessaire pour atteindre le drapeau d'arrivée.
 
 ## 6. Conclusion
 
