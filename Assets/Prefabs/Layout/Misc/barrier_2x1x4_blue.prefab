@@ -165,6 +165,8 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::Toggleable
   startActive: 1
+  activeMaterial: {fileID: 2100000, guid: bbdcadcdeb881ad43b74975c8ef66e16, type: 2}
+  inactiveMaterial: {fileID: 2100000, guid: ef7a01db638df72458de450abd626117, type: 2}
 --- !u!114 &4683911935176359480
 MonoBehaviour:
   m_ObjectHideFlags: 0

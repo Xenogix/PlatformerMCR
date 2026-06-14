@@ -12,6 +12,12 @@ public class Toggleable : MonoBehaviour
     [Tooltip("State at level start. true = present (renderers + colliders on); false = gone (hidden + passable).")]
     [SerializeField] private bool startActive = true;
 
+    [Tooltip("Optional. When BOTH are assigned, the object STAYS VISIBLE and swaps material by state " +
+             "(active = solid, inactive = translucent) instead of hiding its renderers — e.g. a door that " +
+             "goes see-through when open, or a spike that ghosts out when disarmed. Leave empty to hide/show.")]
+    [SerializeField] private Material activeMaterial;
+    [SerializeField] private Material inactiveMaterial;
+
     /// <summary>Current state. true = renderers + colliders enabled.</summary>
     public bool IsActive { get; private set; }
 
@@ -46,8 +52,22 @@ public class Toggleable : MonoBehaviour
             _colliders = GetComponentsInChildren<Collider2D>(includeInactive: true);
             _cached = true;
         }
+        // With both materials assigned, stay visible and swap material (solid <-> translucent); otherwise
+        // hide/show the renderers. Either way the collider follows the state (active = solid, blocking).
+        bool swap = activeMaterial != null && inactiveMaterial != null;
         for (int i = 0; i < _renderers.Length; i++)
-            if (_renderers[i] != null) _renderers[i].enabled = active;
+        {
+            if (_renderers[i] == null) continue;
+            if (swap)
+            {
+                _renderers[i].enabled = true;
+                _renderers[i].sharedMaterial = active ? activeMaterial : inactiveMaterial;
+            }
+            else
+            {
+                _renderers[i].enabled = active;
+            }
+        }
         for (int i = 0; i < _colliders.Length; i++)
             if (_colliders[i] != null) _colliders[i].enabled = active;
     }
