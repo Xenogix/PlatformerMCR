@@ -1,0 +1,86 @@
+@startuml system-overview
+title PlatformerMCR - system overview (rewind, clones, shadow, levels)
+
+skinparam shadowing false
+skinparam defaultFontName sans-serif
+skinparam packageStyle rectangle
+skinparam componentStyle rectangle
+hide empty members
+
+package "Time" {
+  [GameClock]
+}
+
+package "Rewind" <<Memento>> {
+  [RewindCaretaker]
+  [RewindableEntity]
+  [RewindChannel] as Channels
+  [IHistory] as History
+}
+
+package "Commands" <<Command>> {
+  [PlayerCommandInvoker] as Invoker
+  [CommandTimeline] as Timeline
+  [ClonePlayback]
+}
+
+package "Director / UI" {
+  [RewindDirector] as Director
+  [EchoSpawner]
+  [HUD]
+}
+
+package "Player (avatar)" {
+  [Player]
+  [PlayerController]
+}
+
+package "Interactables" {
+  [Toggleable]
+  [Lever]
+  [Hazard]
+}
+
+package "Shadow (best run)" {
+  [BestRunRecorder]
+  [ShadowDirector]
+  [ShadowPlayback]
+  [ShadowStore]
+}
+
+package "Levels" {
+  [LevelSet]
+  [LevelLoader]
+  [FinishFlag]
+}
+
+[GameClock] --> [RewindCaretaker] : ticks FIRST (observer)
+[GameClock] --> Invoker : ticks (mover)
+[GameClock] --> [ClonePlayback] : ticks (mover)
+[GameClock] --> [ShadowPlayback] : ticks (mover)
+
+[RewindCaretaker] --> [RewindableEntity] : capture / restore
+[RewindableEntity] --> Channels : owns
+Channels --> History : stores via (Dense/Sparse)
+
+Invoker --> [Player] : execute
+Invoker --> Timeline : record
+[ClonePlayback] --> Timeline : replay by tick
+[Player] --> [PlayerController]
+
+Director --> [RewindCaretaker] : Preview / Commit
+Director --> [EchoSpawner] : spawn echo
+Director --> [HUD]
+[EchoSpawner] ..> [ClonePlayback] : seeds echo
+
+[Lever] --> [Toggleable] : toggles targets
+Channels ..> [Toggleable] : read / write
+
+[FinishFlag] --> [BestRunRecorder] : record if best
+[FinishFlag] --> [LevelLoader] : load next (loops 09->01)
+[LevelLoader] --> [LevelSet]
+[BestRunRecorder] ..> Channels : export path
+[BestRunRecorder] --> [ShadowStore] : save
+[ShadowDirector] --> [ShadowStore] : load
+[ShadowDirector] --> [ShadowPlayback] : spawn ghosts
+@enduml

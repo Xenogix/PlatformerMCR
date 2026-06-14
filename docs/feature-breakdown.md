@@ -6,6 +6,17 @@ The game is a CRT‑TV‑themed puzzle‑platformer whose headline mechanic is *
 
 ---
 
+## Diagrams
+
+Rendered under `docs/presentation/` (PlantUML source + PNG/SVG):
+
+- **`system-overview`** — the whole system at a glance (the map below, in one picture).
+- **`command-pattern-class-diagram`** / **`command-pattern-sequence`** — input recorded once, replayed on clones.
+- **`memento-pattern-class-diagram`** — rewindable state (Caretaker / Originator / Memento) + the Dense‑vs‑Sparse storage Strategy.
+- **`rewind-sequence`** — capture each tick, then commit a jump‑back and spawn an echo.
+
+---
+
 ## 1. Time & ticking — the spine
 
 | File | Role |
@@ -72,7 +83,8 @@ Everything deterministic hangs off a single integer `Tick`. Each fixed step the 
 
 | File | Role |
 |------|------|
-| `Assets/Scripts/Rewind/RewindDirector.cs` | Scrub UI/input; on confirm, `Commit`s the rewind and spawns an echo seeded from the restored state. |
+| `Assets/Scripts/Rewind/RewindDirector.cs` | Scrub UI/input + orchestration; on confirm, `Commit`s the rewind, slices the timeline, and asks `EchoSpawner` for the clone. |
+| `Assets/Scripts/Rewind/EchoSpawner.cs` | Instantiates + seeds + tints an echo and registers/captures it (extracted from the director so it stays focused on scrubbing). |
 | `Assets/Scripts/Commands/ClonePlayback.cs` | Replays a `CommandTimeline` onto an echo. |
 
 **Choice — replay by *absolute clock tick*, not a spawn‑relative index.** `ClonePlayback` executes the command recorded for the current clock tick (`GetAtTick`). So a clock rewind automatically rewinds the replay for free, and the echo's pose is restored by its own `RigidbodyChannel`. Forward, physics is non‑deterministic so echoes drift — that divergence is the point.
@@ -118,7 +130,7 @@ Dynamic body with **custom gravity** (`gravityScale = 0`, gravity applied in cod
 
 **Choice — doors stay active, toggle renderer/collider** (not `SetActive(false)`): deactivating the GameObject collided with `RewindableEntity`'s own dormancy and produced impossible rewind states.
 
-Prefabs: `barrier_2x1x{2,4}_blue` migrated to `Toggleable + ToggleableChannel`; new `spike_hazard` prefab (real floor‑spike mesh, base + spikes child carrying the `Hazard` + kill‑trigger) registered in the Level Painter *Hazards* palette.
+Prefabs: `barrier_2x1x{2,4}_blue` migrated to `Toggleable + ToggleableChannel`; new `spike_hazard` prefab (real floor‑spike mesh, base + spikes child carrying the `Hazard` + kill‑trigger) registered in the Level Painter *Hazards* palette (`Assets/Prefabs/Layout/Hazards/spike_hazard.prefab`).
 
 ---
 

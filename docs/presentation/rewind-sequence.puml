@@ -1,0 +1,37 @@
+@startuml rewind-sequence
+title Rewind runtime - capture each tick, then commit a jump-back and leave an echo
+
+skinparam shadowing false
+skinparam defaultFontName sans-serif
+
+participant GameClock
+participant "RewindCaretaker" as Caretaker
+participant "RewindableEntity" as Entity
+participant "IHistory<T>" as History
+participant "RewindDirector" as Director
+participant "EchoSpawner" as Spawner
+
+== Each fixed tick: snapshot the ENTERING state ==
+GameClock -> Caretaker : Tick(t)   // observers run FIRST
+Caretaker -> Entity : Capture(t)
+Entity -> History : Record(t, Read())
+GameClock -> GameClock : movers act\n(player invoker, clone playbacks)
+GameClock -> GameClock : Tick++
+
+== Player confirms a rewind + clone (RewindDirector) ==
+Director -> Caretaker : Commit(target)
+loop each entity
+  Caretaker -> Entity : RestoreTo(target)
+  Entity -> History : TryValueAt(target) -> Write
+  Caretaker -> Entity : DiscardAfter(target)\n[only if alive @ target]
+end
+Caretaker -> GameClock : RewindTo(target)
+Director -> Director : Timeline.SliceFromTick(target)
+Director -> Spawner : Spawn(echoPrefab, state@target, sliced script)
+note over Spawner
+  The echo replays the sliced commands by
+  ABSOLUTE tick, so a later rewind rewinds
+  it for free; its pose is restored by its
+  own RewindableEntity.
+end note
+@enduml

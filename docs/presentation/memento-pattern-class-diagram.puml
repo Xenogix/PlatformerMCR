@@ -1,0 +1,79 @@
+@startuml memento-pattern-class-diagram
+title Memento pattern in PlatformerMCR - rewindable state, with Strategy storage
+
+skinparam shadowing false
+skinparam classAttributeIconSize 0
+skinparam defaultFontName sans-serif
+skinparam packageStyle rectangle
+hide empty members
+
+class RewindCaretaker <<Caretaker>> {
+  -entities : List<RewindableEntity>
+  +Tick(tick, dt)
+  +Preview(tick)
+  +Commit(tick) : int
+}
+
+class RewindableEntity <<Originator (per object)>> {
+  -alive : SparseHistory<bool>
+  -channels : IRewindChannel[]
+  +Capture(tick)
+  +RestoreTo(tick)
+  +DiscardAfter(tick)
+}
+
+interface IRewindChannel {
+  +Capture(tick)
+  +Restore(tick)
+}
+
+abstract class "RewindChannel<T>" as RC <<Originator>> {
+  -history : IHistory<T>
+  #Read() : T
+  #Write(state : T)
+}
+
+class RigidbodyChannel
+class ToggleableChannel
+
+class RigidbodyState <<Memento>> {
+  +Position : Vector2
+  +Rotation : float
+  +LinearVelocity : Vector2
+  +AngularVelocity : float
+}
+
+interface "IHistory<T>" as IH <<Strategy>> {
+  +Record(tick, value)
+  +TryValueAt(tick, out value) : bool
+  +DiscardAfter(tick)
+  +TrimBefore(windowStart)
+}
+class "DenseHistory<T>" as Dense <<per-tick>>
+class "SparseHistory<T>" as Sparse <<change-only>>
+
+RewindCaretaker o--> "*" RewindableEntity
+RewindableEntity o--> "*" IRewindChannel
+RewindableEntity --> Sparse : alive record
+IRewindChannel <|.. RC
+RC <|-- RigidbodyChannel
+RC <|-- ToggleableChannel
+RC o--> IH : stores via
+IH <|.. Dense
+IH <|.. Sparse
+RigidbodyChannel ..> RigidbodyState : Read() / Write()
+
+note bottom of RigidbodyState
+  The memento: a plain value struct (the
+  captured slice of an object's state).
+  IHistory keeps the series of mementos;
+  the Caretaker never inspects their contents.
+end note
+
+note right of IH
+  Strategy: Dense = one value per tick
+  (continuous data); Sparse = change-only
+  with carry-forward (rare flags: alive,
+  lever/door state).
+end note
+@enduml
