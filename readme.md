@@ -51,11 +51,13 @@ Le pattern Commande est particulièrement utile pour enregistrer les actions du 
 
 ## 5. Déploiement
 
-> _Tout ce qu'il faut pour compiler / lancer l'application._
+Pour commencer à développer ou compiler une version du projet, commencez par cloner le repository sur votre machine.
 
-- Prérequis (version d'Unity, paquets)
-- Cloner et ouvrir le projet
-- Générer un build / lancer dans l'éditeur
+Afin de compiler ou travailler sur le projet, nous conseillons d'installer [Unity Hub](https://docs.unity.com/en-us/hub/install-hub). Vous pourrez ensuite ouvrir le dossier racine du projet avec Unity Hub, qui vous proposera d'installer automatiquement la version de Unity compatible. Ce projet utilise Unity 6 et plus spécifiquement la version `6000.4.6f1`.
+
+L'éditeur de Unity offre la possibilité de compiler le projet pour diverses plateformes, qui vous seront proposées avant l'installation. Vous pourrez ensuite compiler le projet via le menu `File` -> `Build and Run`. Choisissez ensuite la destination de la compilation. Par exemple dans un dossier `Build` que vous aurez ajouté à la racine du projet et qui sera ignoré par git.
+
+Des versions précompilées pour Windows et Linux (x86-64) peuvent être trouvée dans la section [releases](https://github.com/Xenogix/PlatformerMCR/releases).
 
 ## 6. Utilisation
 
