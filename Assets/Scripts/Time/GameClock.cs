@@ -96,9 +96,15 @@ public class GameClock : MonoBehaviour
     {
         if (IsPaused) return; // frozen while scrubbing; timeScale 0 already stops this, kept explicit
         float dt = Time.fixedDeltaTime;
-        _observers.Tick(Tick, dt); // snapshot the ENTERING state first (see class summary)
-        _movers.Tick(Tick, dt);
-        Tick++;
+        try
+        {
+            _observers.Tick(Tick, dt); // snapshot the ENTERING state first (see class summary)
+            _movers.Tick(Tick, dt);
+        }
+        finally
+        {
+            Tick++; // advance even if a tickable threw, so one faulty component can't freeze game time
+        }
     }
 
     /// <summary>

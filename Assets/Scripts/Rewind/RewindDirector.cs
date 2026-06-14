@@ -186,8 +186,11 @@ public sealed class RewindDirector : MonoBehaviour
         int target = caretaker.Commit(scrubTick);
         if (target < 0) { CancelScrub(); return; }
 
-        // The live player keeps only [.., target] and re-records forward from target+1.
-        livePlayer.Timeline.TruncateAfterTick(target);
+        // Keep commands [.., target-1]; the clock resumed AT `target`, so the player re-runs that tick
+        // and re-records it. Truncating to `target` would keep the old change-frame at `target` AND let
+        // the re-record append a second one — two frames at one tick, which the timeline's binary search
+        // then reads inconsistently (the source of stray clone inputs). Mirror of ConfirmClone's split.
+        livePlayer.Timeline.TruncateAfterTick(target - 1);
         Resume();
     }
 

@@ -69,6 +69,10 @@ public sealed class RewindableEntity : MonoBehaviour
         for (int i = 0; i < _channels.Length; i++) _channels[i].Restore(tick);
         gameObject.SetActive(true);
         _dormant = false;
+        // Drop the stale post-revive existence (e.g. the old despawn): the forward replay regenerates
+        // it. Without this, the Capture() that immediately follows appends true@tick AFTER that later
+        // false, breaking the change-only record's ascending-tick order (its binary search misreads it).
+        _alive.DiscardAfter(tick);
         for (int i = 0; i < _channels.Length; i++) _channels[i].Clear();
     }
 
