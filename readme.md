@@ -11,12 +11,7 @@ Les niveaux défilent en boucle, le joueur entrant en compétition avec l'ombre 
 Le pattern Commande est particulièrement utile pour enregistrer les actions du joueur 
  et les rejouer sur ses clones. 
 
-- Captures d'écran / aperçu
-
 ## 2. Mise en oeuvre du modèle dans l'application
-
-> _Coeur du rapport : comment Command est concrètement implémenté dans le projet et
-> pourquoi il est ici pertinent (enregistrement des entrées, rewind, rejeu sur les clones)._
 
 - Correspondance participants du pattern <-> classes du projet
   - `ICommand`, `JumpCommand`, `MoveCommand`, `UseCommand` - les commandes
